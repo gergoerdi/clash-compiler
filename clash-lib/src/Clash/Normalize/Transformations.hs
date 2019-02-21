@@ -1008,10 +1008,9 @@ constantSpec ctx@(TransformContext is0 _) e@(App e1 e2)
   , (_, []) <- Either.partitionEithers args
   , null $ Lens.toListOf termFreeTyVars e2
   = do e2isConstant <- isConstantNotClockReset e2
-       traceM $ "constantSpec: e2: " ++ showPpr e2
-       if e2isConstant then do
+       traceM $ "-------------------------------\n" ++ "constantSpec: e2: " ++ showPpr e2
+       if trace "e2isConstant: " $ traceShowId $ e2isConstant then do
          -- "Simple" constant
-         traceM $ "was a simple constant, specializing"
          specializeNorm ctx e
        else do
          -- Consider global variables constant if:
@@ -1024,20 +1023,16 @@ constantSpec ctx@(TransformContext is0 _) e@(App e1 e2)
          let is1            = extendInScopeSet is0 f
          e2isNonRecGlobVar <- isNonRecursiveGlobalVar is1 e2
 
-         if e2isNonRecGlobVar then do
-           traceM $ "non rec global var"
+         if trace "e2isNonRecGlobVar: " $ traceShowId e2isNonRecGlobVar then do
            bndrs <- Lens.use bindings
            let (Var i, iArgs)     = collectArgs e2
                Just (_, _, _, t) = lookupVarEnv i bndrs
            argsConstant <- and <$> mapM (either isConstantNotClockReset (const (pure True))) iArgs
-           if f `idDoesNotOccurIn` t && argsConstant then do
-             traceM $ "args were constant / not recursive. Specializing"
+           if trace "idoccurs, argsConstant: " $ traceShow (f `idDoesNotOccurIn` t, argsConstant) $ f `idDoesNotOccurIn` t && argsConstant then do
              specializeNorm ctx e
            else do
-             traceM $ "bummer: " ++ show (f `idDoesNotOccurIn` t, argsConstant)
              return e
          else do
-          traceM $ "rec / global var"
           return e
 
 constantSpec _ e = return e
