@@ -62,7 +62,7 @@ import           Clash.Netlist.Util
 import           Clash.Normalize.Strategy
 import           Clash.Normalize.Transformations
   (appProp, bindConstantVar, caseCon, flattenLet, reduceConst, topLet,
-   reduceNonRepPrim)
+   reduceNonRepPrim, deadCode, removeUnusedExpr)
 import           Clash.Normalize.Types
 import           Clash.Normalize.Util
 import           Clash.Primitives.Types           (CompiledPrimMap)
@@ -71,9 +71,11 @@ import           Clash.Rewrite.Types
   (RewriteEnv (..), RewriteState (..), bindings, curFun, dbgLevel, extra,
    tcCache, topEntities, typeTranslator, customReprs, globalInScope)
 import           Clash.Rewrite.Util
-  (apply, isUntranslatableType, runRewrite, runRewriteSession)
+  (apply, isUntranslatableType, runRewrite, runRewriteSession, findFreeVarCycles)
 import           Clash.Signal.Internal            (ResetKind (..))
 import           Clash.Util
+
+import Debug.Trace
 
 -- | Run a NormalizeSession in a given environment
 runNormalization
@@ -146,7 +148,11 @@ normalize
 normalize []  = return emptyVarEnv
 normalize top = do
   (new,topNormalized) <- unzip <$> mapM normalize' top
+--  traceM "normalize topNormalized:"
+--  traceM $ show $ findFreeVarCycles (mkVarEnv topNormalized)
   newNormalized <- normalize (concat new)
+--  traceM "normalize newNormalized:"
+--  traceM $ show $ findFreeVarCycles newNormalized
   return (unionVarEnv (mkVarEnv topNormalized) newNormalized)
 
 normalize'
@@ -368,6 +374,7 @@ flattenCallTree (CBranch (nm,(nm',sp,inl,tm)) used) = do
                  apply "caseCon" caseCon >->
                  apply "reduceConst" reduceConst >->
                  apply "reduceNonRepPrim" reduceNonRepPrim >->
+                 apply "removeUnusedExpr" removeUnusedExpr >->
                  apply "flattenLet" flattenLet) !->
       topdownSucR (apply "topLet" topLet)
 

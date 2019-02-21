@@ -310,7 +310,7 @@ topSortHWTys hwtys = sorted
     edges  = concatMap edge hwtys
     sorted =
       case reverseTopSort nodes edges of
-        Left err -> error ("[BUG IN CLASH] topSortHWTys: " ++ err)
+        Left err -> error ("[BUG IN CLASH] topSortHWTys: " ++ show err)
         Right ns -> ns
 
     edge t@(Vector _ elTy) = maybe [] ((:[]) . (HashMap.lookupDefault (error $ $(curLoc) ++ "Vector") t nodesI,))

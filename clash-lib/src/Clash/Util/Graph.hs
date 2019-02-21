@@ -5,7 +5,7 @@
 
   Collection of utilities
 -}
-module Clash.Util.Graph (topSort, reverseTopSort) where
+module Clash.Util.Graph (topSort, reverseTopSort, TopSortError(..)) where
 
 import           Data.Tuple            (swap)
 import           Data.Foldable         (foldlM)
@@ -15,6 +15,22 @@ import qualified Data.IntSet           as IntSet
 data Marker
   = Temporary
   | Permanent
+
+data TopSortError
+  = CycleDetected Int
+  -- ^ Cycle detected. Node @a@ was part of the cycle.
+  | EdgesNoNodes
+  -- ^ Edges specified, but no nodes
+  | MissingNode Int
+  -- ^ Node @a@ mentioned in edge list, but not present in node list
+
+instance Show TopSortError where
+  show (CycleDetected n) =
+    "CycleDetected: Can't sort non-DAG. Node with id " ++ show n ++ " was part of cycle."
+  show EdgesNoNodes =
+    "EdgesNoNodes: Node list was empty, but edges non-empty"
+  show (MissingNode n) =
+    "MissingNode: node with id " ++ show n ++ " part of an edge, but not in node list"
 
 headSafe :: [a] -> Maybe a
 headSafe [] = Nothing
@@ -31,11 +47,11 @@ topSortVisit'
   -- ^ Sorted so far
   -> Int
   -- ^ Node to visit
-  -> Either String (IntSet.IntSet, IntMap.IntMap Marker, [Int])
+  -> Either TopSortError (IntSet.IntSet, IntMap.IntMap Marker, [Int])
 topSortVisit' edges unmarked marked sorted node =
   case IntMap.lookup node marked of
     Just Permanent -> Right (unmarked, marked, sorted)
-    Just Temporary -> Left "cycle detected: cannot topsort cyclic graph"
+    Just Temporary -> Left (CycleDetected node)
     Nothing -> do
       let marked'   = IntMap.insert node Temporary marked
       let unmarked' = IntSet.delete node unmarked
@@ -59,7 +75,7 @@ topSortVisit
   -- ^ Sorted so far
   -> Int
   -- ^ Node to visit
-  -> Either String (IntSet.IntSet, IntMap.IntMap Marker, [Int])
+  -> Either TopSortError (IntSet.IntSet, IntMap.IntMap Marker, [Int])
 topSortVisit edges unmarked marked sorted node = do
   (unmarked', marked', sorted') <-
     topSortVisit' edges unmarked marked sorted node
@@ -76,10 +92,10 @@ topSort
   -- ^ Nodes
   -> [(Int, Int)]
   -- ^ Edges
-  -> Either String [a]
+  -> Either TopSortError [a]
   -- ^ Error message or topologically sorted nodes
 topSort []             []     = Right []
-topSort []             _edges = Left "Node list was empty, but edges non-empty"
+topSort []             _edges = Left EdgesNoNodes
 topSort nodes@(node:_)  edges = do
   _ <- mapM (\(n, m) -> checkNode n >> checkNode m) edges
 
@@ -99,17 +115,13 @@ topSort nodes@(node:_)  edges = do
       -- Lookup node in nodes map. If not present, yield error
       lookup' n =
         case IntMap.lookup n nodes' of
-          Nothing
-            -> Left ("Node " ++ show n ++ " in edge list, but not in node list.")
-          Just n'
-            -> Right n'
+          Nothing -> Left (MissingNode n)
+          Just n' -> Right n'
 
       -- Check if edge is valid (i.e., mentioned nodes are in node list)
       checkNode n
-        | IntMap.notMember n nodes' =
-            Left ("Node " ++ show n ++ " in edge list, but not in node list.")
-        | otherwise =
-            Right n
+        | IntMap.notMember n nodes' = Left (MissingNode n)
+        | otherwise                 = Right n
 
 -- | Same as `reverse (topSort nodes edges)` if alternative representations are
 -- considered the same. That is, topSort might produce multiple answers and
@@ -121,7 +133,7 @@ reverseTopSort
   -- ^ Nodes
   -> [(Int, Int)]
   -- ^ Edges
-  -> Either String [a]
+  -> Either TopSortError [a]
   -- ^ Reversely, topologically sorted nodes
 reverseTopSort nodes edges =
   topSort nodes (map swap edges)

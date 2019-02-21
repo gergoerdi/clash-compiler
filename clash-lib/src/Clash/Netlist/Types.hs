@@ -287,7 +287,7 @@ data Modifier
   | VecAppend -- ^ See the expression in the context of a Vector append operation
   | RTreeAppend -- ^ See the expression in the context of a Tree append operation
   | Nested Modifier Modifier
-  deriving Show
+  deriving (Show, Generic, NFData)
 
 -- | Expression used in RHS of a declaration
 data Expr
@@ -312,7 +312,7 @@ data Expr
       !Bool
   -- ^ Instantiation of a BlackBox expression
   | ConvBV     (Maybe Identifier) HWType Bool Expr
-  deriving Show
+  deriving (Show, Generic, NFData)
 
 -- | Literals used in an expression
 data Literal
@@ -322,7 +322,7 @@ data Literal
   | BoolLit   !Bool             -- ^ Boolean literal
   | VecLit    [Literal]         -- ^ Vector literal
   | StringLit !String           -- ^ String literal
-  deriving (Eq,Show)
+  deriving (Eq, Show, Generic, NFData)
 
 -- | Bit literal
 data Bit
@@ -330,7 +330,7 @@ data Bit
   | L -- ^ Low
   | U -- ^ Undefined
   | Z -- ^ High-impedance
-  deriving (Eq,Show,Typeable,Lift)
+  deriving (Eq,Show,Typeable,Lift, Generic, NFData)
 
 
 toBit :: Integer -- ^ mask
@@ -365,7 +365,7 @@ data BlackBoxContext
   , bbCompName :: Identifier
   -- ^ The component the BlackBox is instantiated in
   }
-  deriving Show
+  deriving (Show, Generic, NFData)
 
 type BBName = String
 type BBHash = Int

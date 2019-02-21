@@ -17,6 +17,8 @@
 
 module Clash.Driver where
 
+import Debug.Trace
+
 import qualified Control.Concurrent.Supply        as Supply
 import           Control.DeepSeq
 import           Control.Exception                (tryJust, bracket)
@@ -64,6 +66,7 @@ import           Clash.Annotations.BitRepresentation.Internal
 import           Clash.Annotations.TopEntity      (TopEntity (..))
 import           Clash.Annotations.TopEntity.Extra ()
 import           Clash.Backend
+import           Clash.Rewrite.Util               (findFreeVarCycles)
 import           Clash.Core.Evaluator             (PrimEvaluator)
 import           Clash.Core.Name                  (Name (..))
 import           Clash.Core.Term                  (Term)
@@ -232,6 +235,8 @@ generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval
       normTime <- transformedBindings `deepseq` Clock.getCurrentTime
       let prepNormDiff = Clock.diffUTCTime normTime prevTime
       putStrLn $ "Normalisation took " ++ show prepNormDiff
+
+--      putStrLn $ show $ findFreeVarCycles transformedBindings
 
       -- 2. Generate netlist for topEntity
       (netlist,seen') <-
@@ -630,9 +635,15 @@ normalizeEntity
 normalizeEntity reprs bindingsMap primMap tcm tupTcm typeTrans eval topEntities
   opts supply tm = transformedBindings
   where
-    doNorm = do norm <- normalize [tm]
+    doNorm = do -- traceM "Before normalize:"
+--                traceM $ show $ findFreeVarCycles bindingsMap
+                norm <- normalize [tm]
+--                traceM "After normalize:"
+--                traceM $ show $ findFreeVarCycles norm
                 let normChecked = checkNonRecursive norm
                 cleaned <- cleanupGraph tm normChecked
+--                traceM "After clean:"
+--                traceM $ show $ findFreeVarCycles cleaned
                 is0 <- use globalInScope
                 return (cleaned,is0)
     transformedBindings = runNormalization opts supply bindingsMap

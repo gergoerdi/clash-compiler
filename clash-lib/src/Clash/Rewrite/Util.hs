@@ -9,12 +9,13 @@
 -}
 
 {-# LANGUAGE CPP                      #-}
+{-# LANGUAGE FlexibleContexts         #-}
 {-# LANGUAGE LambdaCase               #-}
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE OverloadedStrings        #-}
 {-# LANGUAGE Rank2Types               #-}
-{-# LANGUAGE FlexibleContexts         #-}
 {-# LANGUAGE TemplateHaskell          #-}
+{-# LANGUAGE TupleSections            #-}
 {-# LANGUAGE ViewPatterns             #-}
 
 module Clash.Rewrite.Util where
@@ -25,15 +26,16 @@ import           Control.Lens
   (Lens', (%=), (+=), (^.), _3, _4, _Left)
 import qualified Control.Lens                as Lens
 import qualified Control.Monad               as Monad
+import           Control.Monad               (foldM)
 import           Control.Monad.Fail          (MonadFail)
 import qualified Control.Monad.State.Strict  as State
 import qualified Control.Monad.Writer        as Writer
 import           Data.Bifunctor              (bimap)
 import           Data.Coerce                 (coerce)
 import           Data.Functor.Const          (Const (..))
-import           Data.List                   (group, sort)
+import           Data.List                   (group, sort, nub)
 import qualified Data.Map                    as Map
-import           Data.Maybe                  (catMaybes,isJust,mapMaybe)
+import           Data.Maybe                  (catMaybes,isJust,mapMaybe,fromJust)
 import qualified Data.Monoid                 as Monoid
 import qualified Data.Set                    as Set
 import qualified Data.Set.Lens               as Lens
@@ -45,7 +47,7 @@ import           GHC.Stack                   (HasCallStack)
 
 import           Clash.Core.DataCon          (dcExtTyVars)
 import           Clash.Core.FreeVars
-  (idDoesNotOccurIn, idOccursIn, typeFreeVars, termFreeVars')
+  (idDoesNotOccurIn, idOccursIn, typeFreeVars, termFreeVars', termFreeVars, termFreeIds)
 import           Clash.Core.Name
 import           Clash.Core.Pretty           (showPpr)
 import           Clash.Core.Subst
@@ -64,14 +66,18 @@ import           Clash.Core.Util
 import           Clash.Core.Var
   (Id, TyVar, Var (..), mkId, mkTyVar)
 import           Clash.Core.VarEnv
-  (InScopeSet, VarEnv, elemVarSet, extendInScopeSet,
-   extendInScopeSetList, mkInScopeSet, notElemVarEnv, unionInScope, uniqAway)
+  (InScopeSet, VarEnv, elemVarSet, extendInScopeSet, eltsVarEnv, elemVarEnv,
+   extendInScopeSetList, mkInScopeSet, notElemVarEnv, unionInScope, uniqAway,
+   lookupVarEnv, lookupVarEnv')
 import           Clash.Driver.Types
-  (DebugLevel (..))
+  (DebugLevel (..), BindingMap)
 import           Clash.Netlist.Util          (representableType)
 import           Clash.Rewrite.Types
 import           Clash.Unique
 import           Clash.Util
+import           Clash.Util.Graph            (TopSortError(CycleDetected), topSort)
+
+import Debug.Trace
 
 -- | Lift an action working in the '_extra' state to the 'RewriteMonad'
 zoomExtra :: State.State extra a
@@ -116,6 +122,50 @@ findAccidentialShadows =
   findDups :: [Id] -> [[Id]]
   findDups ids = filter ((1 <) . length) (group (sort ids))
 
+-- |
+findFreeVarCycles
+  :: HasCallStack
+  => BindingMap
+  -> Maybe Id
+findFreeVarCycles bndrs = do
+--  (f, _) <- Lens.use curFun
+--  ids    <- (\l -> traceShow (map (showPpr . varName) l) l) <$> Set.toList <$> collectInterestingBinders Set.empty ((trace "curFun" $ trace (showPpr f) f))
+  let ids = map (\(i, _, _, _) -> i) (eltsVarEnv bndrs)
+  let terms   = map (\(_, _, _, t) -> t) (map (lookupVarEnv' bndrs) ids)
+      nodeMap = Map.fromList (zip ids [0..])
+
+      -- Construct edges in graph; map each freeVar to an int generated ^
+      edges0 = map (Lens.toListOf termFreeIds) terms
+      edges1 = map (filter (\e -> elemVarEnv e bndrs)) edges0
+      edges2 = concatMap (\(i, ns) -> map (i,) ns) (zip [0..] edges1)
+      edges3 = nub $ map (\(i, n) -> (i, nodeMap Map.! n)) edges2  -- nub >:(
+      edges4 = traceShowId $ {-trace (showPpr f) $ traceShowId $-} filter (uncurry (/=)) edges3
+
+  case topSort (zip [0..] ids) edges4 of
+    Left (CycleDetected n) ->
+      (traceShow n $ Just (ids !! n))
+    Left err ->
+      error ("Unexpected error in findFreeVarCycles: " ++ show err)
+    Right _ ->
+      Nothing
+
+ where
+  collectInterestingBinders
+    :: Set.Set Id
+    -- ^ Seen binders
+    -> Id
+    -- ^ Check binder for free vars
+    -> RewriteMonad extra (Set.Set Id)
+  collectInterestingBinders seen i =
+    if i `Set.member` seen then
+      return seen
+    else do
+      bndrs <- Lens.use bindings
+      let Just (_, _, _, t) = lookupVarEnv i bndrs
+      let freeVars = Lens.toListOf termFreeIds t
+--      trace "XXX" $ trace (showPpr i) $ traceShow (map showPpr freeVars) $
+      foldM collectInterestingBinders (Set.insert i seen) freeVars
+
 
 -- | Record if a transformation is successfully applied
 apply
@@ -141,6 +191,7 @@ apply name rewrite ctx expr = do
     afterFV              <- Lens.setOf <$> localFreeVars <*> pure expr'
     let newFV             = not (afterFV `Set.isSubsetOf` beforeFV)
     let accidentalShadows = findAccidentialShadows expr'
+    freeVarPartOfCycle   <- findFreeVarCycles <$> Lens.use bindings
 
     Monad.when newFV $
             error ( concat [ $(curLoc)
@@ -163,6 +214,9 @@ apply name rewrite ctx expr = do
                      , "or incorrectly extended its InScopeSet before applying a "
                      , "substitution."
                      ])
+
+--    Monad.when (isJust freeVarPartOfCycle) $
+--      error (showPpr (fromJust freeVarPartOfCycle))
 
     traceIf (lvl >= DebugAll && (beforeTy `aeqType` afterTy))
             ( concat [ $(curLoc)
@@ -572,11 +626,14 @@ cloneName nm = do
   i <- getUniqueM
   return nm {nameUniq = i}
 
--- | Test whether a term is a variable reference to a local binder
-isNonGlobalVar :: Term
-           -> RewriteMonad extra Bool
+-- | Test whether a term is _not_ a global variable. If this function returns
+-- False, it might still not exist in local scope.
+isNonGlobalVar
+  :: Term
+  -> RewriteMonad extra Bool
 isNonGlobalVar (Var x) = notElemUniqMap (varName x) <$> Lens.use bindings
 isNonGlobalVar _ = return False
+
 
 {-# INLINE isUntranslatable #-}
 -- | Determine if a term cannot be represented in hardware
@@ -678,15 +735,15 @@ specialise' :: Lens' extra (Map.Map (Id, Int, Either Term Type) Id) -- ^ Lens in
 specialise' specMapLbl specHistLbl specLimitLbl (TransformContext is0 _) e (Var f, args) specArgIn = do
   lvl <- Lens.view dbgLevel
 
+  tcm <- Lens.view tcCache
+  let specArg = bimap (normalizeTermTypes tcm) (normalizeType tcm) specArgIn
+
   -- Don't specialise TopEntities
   topEnts <- Lens.view topEntities
   if f `elemVarSet` topEnts
   then traceIf (lvl >= DebugNone) ("Not specialising TopEntity: " ++ showPpr (varName f)) (return e)
   else do -- NondecreasingIndentation
 
-  tcm <- Lens.view tcCache
-
-  let specArg = bimap (normalizeTermTypes tcm) (normalizeType tcm) specArgIn
   -- Create binders and variable references for free variables in 'specArg'
   -- (specBndrsIn,specVars) :: ([Either Id TyVar], [Either Term Type])
   (specBndrsIn,specVars) <- specArgBndrsAndVars specArg

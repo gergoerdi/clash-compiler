@@ -401,7 +401,7 @@ topSortHWTys hwtys = sorted
 
     sorted =
       case reverseTopSort nodes edges of
-        Left err -> error $ $(curLoc) ++ "[BUG IN CLASH] topSortHWTys: " ++ err
+        Left err -> error $ $(curLoc) ++ "[BUG IN CLASH] topSortHWTys: " ++ show err
         Right ns -> ns
 
     -- `elTy` needs to be rendered before `t`

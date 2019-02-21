@@ -9,6 +9,7 @@
 {-# LANGUAGE BangPatterns      #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE ViewPatterns      #-}
 
 module Clash.Normalize.Util
  ( isConstantArg
@@ -21,6 +22,7 @@ module Clash.Normalize.Util
  , callGraph
  , classifyFunction
  , isCheapFunction
+ , isNonRecursiveGlobalVar
  )
  where
 
@@ -34,18 +36,21 @@ import           Data.Text               (Text)
 import           Clash.Core.FreeVars     (idOccursIn, termFreeIds)
 import           Clash.Core.Term         (Term (..))
 import           Clash.Core.TyCon        (TyConMap)
+import           Clash.Core.Type         (tyView, isFunTy)
 import           Clash.Core.Var          (Id, Var (..))
 import           Clash.Core.VarEnv
 import           Clash.Core.Util
-  (collectArgs, isPolyFun)
+  (collectArgs, isPolyFun, termType)
 import           Clash.Driver.Types      (BindingMap)
 import           Clash.Normalize.Types
 import           Clash.Primitives.Util   (constantArgs)
 import           Clash.Rewrite.Types
-  (bindings,extra,RewriteMonad,CoreContext(AppArg))
+  (bindings,extra,RewriteMonad,CoreContext(AppArg), tcCache)
 import           Clash.Rewrite.Util      (specialise)
 import           Clash.Unique
 import           Clash.Util              (anyM)
+
+import Debug.Trace
 
 -- | Determine if argument should reduce to a constant given a primitive and
 -- an argument number. Caches results.
@@ -122,6 +127,31 @@ isClosed :: TyConMap
          -> Term
          -> Bool
 isClosed tcm = not . isPolyFun tcm
+
+-- | Test whether binder is a non-shadowed global variable
+isGlobalBndr
+  :: InScopeSet
+  -- ^ Local scope
+  -> Id
+  -- ^ Term to check for global variness
+  -> RewriteMonad extra Bool
+isGlobalBndr localScope x = do
+  bndrs <- Lens.use bindings
+  let inLocalScope = x `elemInScopeSet` localScope
+  let inGlobalScope = elemUniqMap (varName x) bndrs
+  return (not inLocalScope && inGlobalScope)
+
+-- | Test whether a given term represents a non-recursive global variable
+isNonRecursiveGlobalVar
+  :: InScopeSet
+  -> Term
+  -> NormalizeSession Bool
+isNonRecursiveGlobalVar is (collectArgs -> (Var i, args)) = do
+  tcm       <- Lens.view tcCache
+  eIsGlobal <- isGlobalBndr is i
+  eIsRec    <- isRecursiveBndr i
+  return (eIsGlobal && not eIsRec)
+isNonRecursiveGlobalVar _ _ = return False
 
 -- | Assert whether a name is a reference to a recursive binder.
 isRecursiveBndr
