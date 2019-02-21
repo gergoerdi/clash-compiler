@@ -1008,7 +1008,7 @@ constantSpec ctx@(TransformContext is0 _) e@(App e1 e2)
   , (_, []) <- Either.partitionEithers args
   , null $ Lens.toListOf termFreeTyVars e2
   = do e2Speccable <- canConstantSpec is0 e2
-       if trace "e2" $ trace (showPpr e2) $ trace "is speccable" $ traceShowId e2Speccable then
+       if trace "---------------------------------" $ trace "e2" $ trace (showPpr e2) $ trace "is speccable" $ traceShowId e2Speccable then
          specializeNorm ctx e
        else
          return e
