@@ -1007,33 +1007,39 @@ constantSpec ctx@(TransformContext is0 _) e@(App e1 e2)
   | (Var {}, args) <- collectArgs e1
   , (_, []) <- Either.partitionEithers args
   , null $ Lens.toListOf termFreeTyVars e2
-  = do e2isConstant <- isConstantNotClockReset e2
-       traceM $ "-------------------------------\n" ++ "constantSpec: e2: " ++ showPpr e2
-       if trace "e2isConstant: " $ traceShowId $ e2isConstant then do
-         -- "Simple" constant
+  = do e2Speccable <- canConstantSpec is0 e2
+       if trace "e2" $ trace (showPpr e2) $ trace "is speccable" $ traceShowId e2Speccable then
          specializeNorm ctx e
-       else do
-         -- Consider global variables constant if:
-         --  * Their definitions do not refer to the current function
-         --  * The variable is not the current function
-         --  * All arguments to it are constant
-         -- To check the latter, we tell `isNonRecursiveGlobalVar` that the
-         -- current function is a local variable.
-         (f, _)            <- Lens.use curFun
-         let is1            = extendInScopeSet is0 f
-         e2isNonRecGlobVar <- isNonRecursiveGlobalVar is1 e2
+       else
+         return e
 
-         if trace "e2isNonRecGlobVar: " $ traceShowId e2isNonRecGlobVar then do
-           bndrs <- Lens.use bindings
-           let (Var i, iArgs)     = collectArgs e2
-               Just (_, _, _, t) = lookupVarEnv i bndrs
-           argsConstant <- and <$> mapM (either isConstantNotClockReset (const (pure True))) iArgs
-           if trace "idoccurs, argsConstant: " $ traceShow (f `idDoesNotOccurIn` t, argsConstant) $ f `idDoesNotOccurIn` t && argsConstant then do
-             specializeNorm ctx e
-           else do
-             return e
-         else do
-          return e
+--  = do e2isConstant <- isConstantNotClockReset e2
+--       traceM $ "-------------------------------\n" ++ "constantSpec: e2: " ++ showPpr e2
+--       if trace "e2isConstant: " $ traceShowId $ e2isConstant then do
+--         -- "Simple" constant
+--         specializeNorm ctx e
+--       else do
+--         -- Consider global variables constant if:
+--         --  * Their definitions do not refer to the current function
+--         --  * The variable is not the current function
+--         --  * All arguments to it are constant
+--         -- To check the latter, we tell `isNonRecursiveGlobalVar` that the
+--         -- current function is a local variable.
+--         (f, _)            <- Lens.use curFun
+--         let is1            = extendInScopeSet is0 f
+--         e2isNonRecGlobVar <- isNonRecursiveGlobalVar is1 e2
+--
+--         if trace "e2isNonRecGlobVar: " $ traceShowId e2isNonRecGlobVar then do
+--           bndrs <- Lens.use bindings
+--           let (Var i, iArgs)     = collectArgs e2
+--               Just (_, _, _, t) = lookupVarEnv i bndrs
+--           argsConstant <- and <$> mapM (either isConstantNotClockReset (const (pure True))) iArgs
+--           if trace "idoccurs, argsConstant: " $ traceShow (f `idDoesNotOccurIn` t, argsConstant) $ f `idDoesNotOccurIn` t && argsConstant then do
+--             specializeNorm ctx e
+--           else do
+--             return e
+--         else do
+--          return e
 
 constantSpec _ e = return e
 

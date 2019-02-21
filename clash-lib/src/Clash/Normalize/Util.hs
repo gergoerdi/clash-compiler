@@ -23,9 +23,11 @@ module Clash.Normalize.Util
  , classifyFunction
  , isCheapFunction
  , isNonRecursiveGlobalVar
+ , canConstantSpec
  )
  where
 
+import           Control.Monad.Writer    (lift)
 import           Control.Lens            ((&),(+~),(%=),(^.),_4)
 import qualified Control.Lens            as Lens
 import qualified Data.List               as List
@@ -40,13 +42,13 @@ import           Clash.Core.Type         (tyView, isFunTy)
 import           Clash.Core.Var          (Id, Var (..))
 import           Clash.Core.VarEnv
 import           Clash.Core.Util
-  (collectArgs, isPolyFun, termType)
+  (collectArgs, isPolyFun, termType, isClockOrReset)
 import           Clash.Driver.Types      (BindingMap)
 import           Clash.Normalize.Types
 import           Clash.Primitives.Util   (constantArgs)
 import           Clash.Rewrite.Types
-  (bindings,extra,RewriteMonad,CoreContext(AppArg), tcCache)
-import           Clash.Rewrite.Util      (specialise)
+  (bindings,extra,RewriteMonad,CoreContext(AppArg), tcCache, curFun)
+import           Clash.Rewrite.Util      (specialise, hasLocalFreeVars)
 import           Clash.Unique
 import           Clash.Util              (anyM)
 
@@ -172,6 +174,29 @@ isRecursiveBndr f = do
           let isR = f `idOccursIn` fBody
           (extra.recursiveComponents) %= extendVarEnv f isR
           return isR
+
+-- |
+canConstantSpec :: InScopeSet -> Term -> RewriteMonad NormalizeState Bool
+canConstantSpec is0 e = do
+  tcm <- Lens.view tcCache
+  if isClockOrReset tcm (termType tcm e) then
+    case collectArgs e of
+      (Prim nm _, _) -> return (nm == "Clash.Transformations.removedArg")
+      _              -> return False
+  else
+    case collectArgs e of
+      (Data _, args)   -> and <$> mapM (either (canConstantSpec is0) (const (pure True))) args
+      (Prim _ _, args) -> and <$> mapM (either (canConstantSpec is0) (const (pure True))) args
+      (Lam _ _, _)     -> not <$> (hasLocalFreeVars <*> pure e)
+      (Var f, args)    -> do
+        (curF, _) <- Lens.use curFun
+
+        argsConst <- and <$> mapM (either (canConstantSpec is0) (const (pure True))) args
+        isNonRecGlobVar <- (isNonRecursiveGlobalVar is0 e)
+        return $ traceShow (argsConst, isNonRecGlobVar, f /= curF) (argsConst && isNonRecGlobVar && f /= curF)
+
+      (Literal _,_)    -> pure True
+      _                -> pure False
 
 -- | A call graph counts the number of occurrences that a functions 'g' is used
 -- in 'f'.
