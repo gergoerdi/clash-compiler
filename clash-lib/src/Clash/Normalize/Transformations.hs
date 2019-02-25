@@ -86,7 +86,7 @@ import           Clash.Core.Evaluator        (PureHeap, whnf')
 import           Clash.Core.Name
   (Name (..), NameSort (..), mkUnsafeSystemName)
 import           Clash.Core.FreeVars
-  (idOccursIn, idsDoNotOccurIn, termFreeIds, termFreeTyVars, typeFreeVars, varsDoNotOccurIn, idDoesNotOccurIn)
+  (idOccursIn, idsDoNotOccurIn, termFreeIds, termFreeTyVars, typeFreeVars, varsDoNotOccurIn)
 import           Clash.Core.Literal          (Literal (..))
 import           Clash.Core.Pretty           (showPpr)
 import           Clash.Core.Subst

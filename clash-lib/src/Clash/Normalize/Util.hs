@@ -27,7 +27,6 @@ module Clash.Normalize.Util
  )
  where
 
-import           Control.Monad.Writer    (lift)
 import           Control.Lens            ((&),(+~),(%=),(^.),_4)
 import qualified Control.Lens            as Lens
 import qualified Data.List               as List
@@ -38,7 +37,6 @@ import           Data.Text               (Text)
 import           Clash.Core.FreeVars     (idOccursIn, termFreeIds)
 import           Clash.Core.Term         (Term (..))
 import           Clash.Core.TyCon        (TyConMap)
-import           Clash.Core.Type         (tyView, isFunTy)
 import           Clash.Core.Var          (Id, Var (..))
 import           Clash.Core.VarEnv
 import           Clash.Core.Util
@@ -148,8 +146,7 @@ isNonRecursiveGlobalVar
   :: InScopeSet
   -> Term
   -> NormalizeSession Bool
-isNonRecursiveGlobalVar is (collectArgs -> (Var i, args)) = do
-  tcm       <- Lens.view tcCache
+isNonRecursiveGlobalVar is (collectArgs -> (Var i, _args)) = do
   eIsGlobal <- isGlobalBndr is i
   eIsRec    <- isRecursiveBndr i
   return (eIsGlobal && not eIsRec)

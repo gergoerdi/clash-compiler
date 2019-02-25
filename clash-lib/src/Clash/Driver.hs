@@ -8,16 +8,10 @@
   Module that connects all the parts of the Clash compiler library
 -}
 
-{-# LANGUAGE LambdaCase               #-}
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE ScopedTypeVariables      #-}
-{-# LANGUAGE TemplateHaskell          #-}
-{-# LANGUAGE TupleSections            #-}
-{-# LANGUAGE ViewPatterns             #-}
 
 module Clash.Driver where
-
-import Debug.Trace
 
 import qualified Control.Concurrent.Supply        as Supply
 import           Control.DeepSeq
@@ -66,7 +60,6 @@ import           Clash.Annotations.BitRepresentation.Internal
 import           Clash.Annotations.TopEntity      (TopEntity (..))
 import           Clash.Annotations.TopEntity.Extra ()
 import           Clash.Backend
-import           Clash.Rewrite.Util               (findFreeVarCycles)
 import           Clash.Core.Evaluator             (PrimEvaluator)
 import           Clash.Core.Name                  (Name (..))
 import           Clash.Core.Term                  (Term)
