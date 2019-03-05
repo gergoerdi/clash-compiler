@@ -100,6 +100,7 @@ class Bundle a where
                    => DSignal domain d a -> Unbundled domain d a
   unbundle s = s
 
+instance Bundle ()
 instance Bundle Bool
 instance Bundle Integer
 instance Bundle Int
@@ -114,14 +115,6 @@ instance Bundle (Index n)
 instance Bundle (Fixed rep int frac)
 instance Bundle (Signed n)
 instance Bundle (Unsigned n)
-
-type InjectivityFixer t d a = a
-
-instance Bundle () where
-  type Unbundled t delay () = InjectivityFixer t delay ()
-
-  bundle   u = pure u
-  unbundle _ = ()
 
 instance Bundle (a,b) where
   type Unbundled t delay (a,b) = (DSignal t delay a, DSignal t delay b)
