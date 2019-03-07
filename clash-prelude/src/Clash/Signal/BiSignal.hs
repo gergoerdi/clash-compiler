@@ -115,10 +115,10 @@ import           Clash.Class.BitPack        (BitPack (..))
 import           Clash.Sized.BitVector      (BitVector)
 import qualified Clash.Sized.Vector         as V
 import           Clash.Sized.Vector         (Vec)
-import           Clash.Signal.Internal      (Signal(..), Domain, head#, tail#)
+import           Clash.Signal.Internal      (Signal(..), head#, tail#)
 import           Clash.XException           (errorX)
 
-import           GHC.TypeLits               (KnownNat, Nat)
+import           GHC.TypeLits               (KnownNat, Nat, Symbol)
 import           GHC.Stack                  (HasCallStack)
 import           Data.Reflection            (Given (..))
 
@@ -150,14 +150,14 @@ instance Given (SBiSignalDefault 'Undefined) where
   given = SUndefined
 
 -- | The /in/ part of an __inout__ port
-data BiSignalIn (ds :: BiSignalDefault) (dom :: Domain) (n :: Nat)
+data BiSignalIn (ds :: BiSignalDefault) (dom :: Symbol) (n :: Nat)
   = BiSignalIn (SBiSignalDefault ds) (Signal dom (Maybe (BitVector n)))
 
 -- | The /out/ part of an __inout__ port
 --
 -- Wraps (multiple) writing signals. The semantics are such that only one of
 -- the signals may write at a single time step.
-newtype BiSignalOut (ds :: BiSignalDefault) (dom :: Domain) (n :: Nat)
+newtype BiSignalOut (ds :: BiSignalDefault) (dom :: Symbol) (n :: Nat)
   = BiSignalOut [Signal dom (Maybe (BitVector n))]
 
 #if MIN_VERSION_base(4,11,0)

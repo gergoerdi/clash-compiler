@@ -55,7 +55,6 @@ module Clash.Signal
   , BiSignalIn
   , BiSignalOut
   , BiSignalDefault(..)
-  , Domain (..)
   , System
     -- * Clock
   , Clock
@@ -70,6 +69,21 @@ module Clash.Signal
   , resetSynchronizer
     -- * Hidden clocks and resets
     -- $hiddenclockandreset
+
+    -- ** Domain
+  , Domain (..)
+  , KnownDomain
+  , KnownPeriod
+  , KnownInit
+  , KnownEdge
+  , Period(..)
+  , Init(..)
+  , InitKind(..)
+  , Edge(..)
+  , EdgeKind(..)
+  , reifyPeriod
+  , reifyInit
+  , reifyEdge
 
     -- ** Hidden clock
   , HiddenClock
@@ -146,7 +160,8 @@ import           Unsafe.Coerce         (unsafeCoerce)
 
 import qualified Clash.Explicit.Signal as E
 import           Clash.Explicit.Signal
-  (System, resetSynchronizer, systemClockGen, systemResetGen, tbSystemClockGen)
+  (System, KnownDomain, resetSynchronizer, systemClockGen, systemResetGen,
+   tbSystemClockGen, system)
 import qualified Clash.Explicit.Signal as S
 import           Clash.Hidden
 import           Clash.Promoted.Nat    (SNat (..))
@@ -311,7 +326,9 @@ type HiddenClockReset domain gated synchronous =
 -- belonging to the 'System' domain.
 --
 -- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks and resets>
-type SystemClockReset = HiddenClockReset System 'Source 'Asynchronous
+type SystemClockReset =
+  ( HiddenClockReset System 'Source 'Asynchronous
+  , KnownDomain System 10000 'InitialDefined 'Rising )
 
 -- | Expose the hidden 'Clock' argument of a component, so it can be applied
 -- explicitly
@@ -584,7 +601,7 @@ sample
 sample s =
   let clk = unsafeCoerce @(Clock System 'Gated)
                          @(Clock domain gated)
-                         (GatedClock @System SSymbol SNat (pure True))
+                         (GatedClock (domainName system) (pure True))
       rst = unsafeCoerce @(Reset System 'Asynchronous)
                          @(Reset domain synchronous)
                          (Async (True :- pure False))
@@ -611,7 +628,7 @@ sampleN
 sampleN n s =
   let clk = unsafeCoerce @(Clock System 'Gated)
                          @(Clock domain gated)
-                         (GatedClock @System SSymbol SNat (pure True))
+                         (GatedClock (domainName system) (pure True))
       rst = unsafeCoerce @(Reset System 'Asynchronous)
                          @(Reset domain synchronous)
                          (Async (True :- pure False))
@@ -635,7 +652,7 @@ sample_lazy
 sample_lazy s =
   let clk = unsafeCoerce @(Clock System 'Gated)
                          @(Clock domain gated)
-                         (GatedClock @System SSymbol SNat (pure True))
+                         (GatedClock (domainName system) (pure True))
       rst = unsafeCoerce @(Reset System 'Asynchronous)
                          @(Reset domain synchronous)
                          (Async (True :- pure False))
@@ -660,7 +677,7 @@ sampleN_lazy
 sampleN_lazy n s =
   let clk = unsafeCoerce @(Clock System 'Gated)
                          @(Clock domain gated)
-                         (GatedClock @System SSymbol SNat (pure True))
+                         (GatedClock (domainName system) (pure True))
       rst = unsafeCoerce @(Reset System 'Asynchronous)
                          @(Reset domain synchronous)
                          (Async (True :- pure False))
@@ -689,7 +706,7 @@ simulate
 simulate f =
   let clk = unsafeCoerce @(Clock System 'Gated)
                          @(Clock domain gated)
-                         (GatedClock @System SSymbol SNat (pure True))
+                         (GatedClock (domainName system) (pure True))
       rst = unsafeCoerce @(Reset System 'Asynchronous)
                          @(Reset domain synchronous)
                          (Async (True :- pure False))
@@ -715,7 +732,7 @@ simulate_lazy
 simulate_lazy f =
   let clk = unsafeCoerce @(Clock System 'Gated)
                          @(Clock domain gated)
-                         (GatedClock @System SSymbol SNat (pure True))
+                         (GatedClock (domainName system) (pure True))
       rst = unsafeCoerce @(Reset System 'Asynchronous)
                          @(Reset domain synchronous)
                          (Async (True :- pure False))
@@ -742,7 +759,7 @@ simulateB
 simulateB f =
   let clk = unsafeCoerce @(Clock System 'Gated)
                          @(Clock domain gated)
-                         (GatedClock @System SSymbol SNat (pure True))
+                         (GatedClock (domainName system) (pure True))
       rst = unsafeCoerce @(Reset System 'Asynchronous)
                          @(Reset domain synchronous)
                          (Async (True :- pure False))
@@ -769,7 +786,7 @@ simulateB_lazy
 simulateB_lazy f =
   let clk = unsafeCoerce @(Clock System 'Gated)
                          @(Clock domain gated)
-                         (GatedClock @System SSymbol SNat (pure True))
+                         (GatedClock (domainName system) (pure True))
       rst = unsafeCoerce @(Reset System 'Asynchronous)
                          @(Reset domain synchronous)
                          (Async (True :- pure False))

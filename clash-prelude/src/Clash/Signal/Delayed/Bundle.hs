@@ -16,13 +16,12 @@ module Clash.Signal.Delayed.Bundle (
   ) where
 
 import           Control.Applicative           (liftA2)
-import           GHC.TypeLits                  (KnownNat)
+import           GHC.TypeLits                  (KnownNat, Symbol)
 import           Prelude                       hiding (head, map, tail)
 
 import           Clash.Signal.Delayed (DSignal, toSignal, unsafeFromSignal)
 import qualified Clash.Signal.Bundle           as B
 
-import           Clash.Signal.Internal         (Domain)
 import           Clash.Sized.BitVector         (Bit, BitVector)
 import           Clash.Sized.Fixed             (Fixed)
 import           Clash.Sized.Index             (Index)
@@ -64,7 +63,7 @@ import           GHC.TypeLits                  (Nat)
 -- @
 --
 class Bundle a where
-  type Unbundled (domain :: Domain) (d :: Nat) a = res | res -> domain d a
+  type Unbundled (domain :: Symbol) (d :: Nat) a = res | res -> domain d a
   type Unbundled domain d a = DSignal domain d a
 
   -- | Example:

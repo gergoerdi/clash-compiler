@@ -33,13 +33,13 @@ where
 import Control.DeepSeq            (NFData)
 import Data.Coerce                (coerce)
 import Data.Default.Class         (Default(..))
-import GHC.TypeLits               (Nat, type (+))
+import GHC.TypeLits               (Nat, type (+), Symbol)
 import Language.Haskell.TH.Syntax (Lift)
 import Test.QuickCheck            (Arbitrary, CoArbitrary)
 
 import Clash.Promoted.Nat         (SNat)
 import Clash.Explicit.Signal
-  (Domain, Signal, fromList, fromList_lazy)
+  (Signal, fromList, fromList_lazy)
 
 {- $setup
 >>> :set -XDataKinds
@@ -63,7 +63,7 @@ let mac :: Clock System gated
 
 -- | A synchronized signal with samples of type @a@, synchronized to clock
 -- @clk@, that has accumulated @delay@ amount of samples delay along its path.
-newtype DSignal (domain :: Domain) (delay :: Nat) a =
+newtype DSignal (domain :: Symbol) (delay :: Nat) a =
     DSignal { -- | Strip a 'DSignal' from its delay information.
               toSignal :: Signal domain a
             }

@@ -45,7 +45,7 @@ import Clash.Explicit.Signal
   (Clock, Reset, Signal, register, unsafeSynchronizer)
 import Clash.Promoted.Nat          (SNat (..), pow2SNat)
 import Clash.Promoted.Nat.Literals (d0)
-import Clash.Signal                (mux)
+import Clash.Signal                (mux, KnownPeriod)
 import Clash.Sized.BitVector       (BitVector, (++#))
 
 -- * Dual flip-flop synchronizer
@@ -73,7 +73,9 @@ import Clash.Sized.BitVector       (BitVector, (++#))
 --      If you want to have /safe/ __word__-synchronisation use
 --      'asyncFIFOSynchronizer'.
 dualFlipFlopSynchronizer
-  :: Clock domain1 gated1
+  :: KnownPeriod domain1 period1
+  => KnownPeriod domain2 period2
+  => Clock domain1 gated1
   -- ^ 'Clock' to which the incoming  data is synchronised
   -> Clock domain2 gated2
   -- ^ 'Clock' to which the outgoing data is synchronised
@@ -89,7 +91,9 @@ dualFlipFlopSynchronizer clk1 clk2 rst i =
 -- * Asynchronous FIFO synchronizer
 
 fifoMem
-  :: Clock wdomain wgated
+  :: KnownPeriod wdomain wperiod
+  => KnownPeriod rdomain rperiod
+  => Clock wdomain wgated
   -> Clock rdomain rgated
   -> SNat addrSize
   -> Signal wdomain Bool
@@ -138,6 +142,8 @@ isFull addrSize@SNat ptr s_ptr = case leTrans @1 @2 @addrSize of
 -- __NB__: This synchroniser can be used for __word__-synchronization.
 asyncFIFOSynchronizer
   :: (2 <= addrSize)
+  => KnownPeriod wdomain wperiod
+  => KnownPeriod rdomain rperiod
   => SNat addrSize
   -- ^ Size of the internally used addresses, the  FIFO contains @2^addrSize@
   -- elements.

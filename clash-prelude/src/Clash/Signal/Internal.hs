@@ -3,8 +3,9 @@ Copyright  :  (C) 2013-2016, University of Twente,
                   2017     , Myrtle Software Ltd, Google Inc.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
--}
 
+-}
+{-# LANGUAGE ConstraintKinds       #-}
 {-# LANGUAGE CPP                   #-}
 {-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE DeriveAnyClass        #-}
@@ -14,9 +15,11 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# LANGUAGE KindSignatures        #-}
 {-# LANGUAGE MagicHash             #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE PolyKinds             #-}
+{-# LANGUAGE RankNTypes            #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TemplateHaskell       #-}
-{-# LANGUAGE TypeFamilies          #-}
+{-# LANGUAGE TypeApplications      #-}
 
 {-# LANGUAGE Unsafe #-}
 
@@ -28,10 +31,25 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
 module Clash.Signal.Internal
   ( -- * Datatypes
-    Domain (..)
-  , Signal (..)
+    Signal (..)
   , head#
   , tail#
+    -- * Domains
+  , Domain (..)
+  , KnownDomain
+  , KnownPeriod
+  , KnownInit
+  , KnownEdge
+  , Period(..)
+  , Init(..)
+  , InitKind(..)
+  , Edge(..)
+  , EdgeKind(..)
+  , reifyPeriod
+  , reifyInit
+  , reifyEdge
+  , mkDomain
+  , withDomain
     -- * Clocks
   , Clock (..)
   , ClockKind (..)
@@ -90,17 +108,17 @@ module Clash.Signal.Internal
   )
 where
 
-import Type.Reflection            (Typeable)
+import Clash.Hidden               (Hidden, fromLabel, expose)
 import Control.Applicative        (liftA2, liftA3)
 import Control.DeepSeq            (NFData, rnf)
 import Data.Default.Class         (Default (..))
 import GHC.Generics               (Generic)
-import GHC.TypeLits               (KnownNat, KnownSymbol, Nat, Symbol)
+import GHC.TypeLits               (KnownNat, KnownSymbol, Symbol, AppendSymbol)
 import Language.Haskell.TH.Syntax (Lift (..))
 import Test.QuickCheck            (Arbitrary (..), CoArbitrary(..), Property,
                                    property)
 
-import Clash.Promoted.Nat         (SNat (..), snatToInteger, snatToNum)
+import Clash.Promoted.Nat         (SNat (..), snatToNum)
 import Clash.Promoted.Symbol      (SSymbol (..))
 import Clash.XException           (errorX, seqX)
 
@@ -119,10 +137,123 @@ import Clash.XException           (errorX, seqX)
 -}
 
 -- * Signal
+data EdgeKind
+  = Rising
+  -- ^ Registers are rising edge (low-to-high) sensitive
+  | Falling
+  -- ^ Registers are falling edge (high-to-low) sensitive
+  | Double
+  -- ^ Registers are sensitive to both a rising edge (low-to-high) and a
+  -- falling edge (high-to-low). [Not supported yet.]
 
--- | A domain with a name (@Symbol@) and a clock period (@Nat@) in /ps/
-data Domain = Dom { domainName :: Symbol, clkPeriod :: Nat }
-  deriving (Typeable)
+-- | Represents a period (in picoseconds) of a certain domain.
+data Period (domain :: Symbol) period =
+  Period (SNat period)
+
+-- | Represents the edge sensitiveness of registers.
+data Edge (domain :: Symbol) (edge :: EdgeKind) where
+  OnRisingEdge  :: Edge dom 'Rising
+  OnFallingEdge :: Edge dom 'Falling
+
+-- | Indicates how a register should behave on power-up
+data InitKind
+  = InitialDefined
+  -- ^ Initial value of a register is defined
+  | InitialUndefined
+  -- ^ Initial value of a register is undefined
+
+-- | Indicates how a register should behave on power-up
+data Init (domain :: Symbol) (init :: InitKind) where
+  Init   :: Init dom 'InitialDefined
+  NoInit :: Init dom 'InitialUndefined
+
+-- | Collection of everything that constitutes a synthesis /Domain/:
+--
+--  * A domain name
+--  * A clock period
+--  * A single power-up value behavior
+--  * A single edge sensitiveness
+--
+data Domain name period initKind edgeKind
+  = Domain { domainName :: SSymbol name
+           , domainPeriod :: Period name period
+           , domainInit :: Init name initKind
+           , domainEdge :: Edge name edgeKind
+           }
+
+mkDomain
+  :: SSymbol domainName
+  -> SNat period
+  -> Init domainName init
+  -> Edge domainName edge
+  -> Domain domainName period init edge
+mkDomain name period = Domain name (Period period)
+
+type KnownPeriod domain period =
+  Hidden
+    -- append _domain to allow multiple KnownPeriod constraints:
+    (AppendSymbol domain "_period")
+    (Period domain period)
+
+type KnownInit domain init =
+  Hidden
+    -- append _domain to allow multiple KnownInit constraints:
+    (AppendSymbol domain "_init")
+    (Init domain init)
+
+type KnownEdge domain edge =
+  Hidden
+    -- append _domain to allow multiple KnownEdge constraints:
+    (AppendSymbol domain "_edge")
+    (Edge domain edge)
+
+type KnownDomain domain period init edge =
+  ( KnownPeriod domain period
+  , KnownInit domain init
+  , KnownEdge domain edge
+  )
+
+reifyPeriod
+  :: forall domain period
+   . KnownPeriod domain period
+  => Period domain period
+reifyPeriod =
+  fromLabel @(AppendSymbol domain "_period")
+{-# INLINE reifyPeriod #-}
+
+reifyInit
+  :: forall domain init
+   . KnownInit domain init
+  => Init domain init
+reifyInit =
+  fromLabel @(AppendSymbol domain "_init")
+{-# INLINE reifyInit #-}
+
+reifyEdge
+  :: forall domain edge
+   . KnownEdge domain edge
+  => Edge domain edge
+reifyEdge =
+  fromLabel @(AppendSymbol domain "_edge")
+{-# INLINE reifyEdge #-}
+
+withDomain
+  :: forall domain period init edge r
+   . Domain domain period init edge
+  -> (KnownDomain domain period init edge => r)
+  -> r
+withDomain =
+  \dom f ->
+    expose
+      @(AppendSymbol domain "_period")
+      (expose
+        @(AppendSymbol domain "_init")
+        (expose
+          @(AppendSymbol domain "_edge")
+          f
+          (domainEdge dom))
+        (domainInit dom))
+      (domainPeriod dom)
 
 infixr 5 :-
 {- | CλaSH has synchronous 'Signal's in the form of:
@@ -152,7 +283,7 @@ so do __not__ do that!
 * __NB__: You should be judicious using a clock with period of @1@ as you can
 never create a clock that goes any faster!
 -}
-data Signal (domain :: Domain) a
+data Signal (domain :: Symbol) a
   -- | The constructor, @(':-')@, is __not__ synthesisable.
   = a :- Signal domain a
 
@@ -266,43 +397,46 @@ data ClockKind
   deriving (Eq,Ord,Show,Generic,NFData)
 
 -- | A clock signal belonging to a @domain@
-data Clock (domain :: Domain) (gated :: ClockKind) where
+data Clock (domain :: Symbol) (gated :: ClockKind) where
   Clock
-    :: (domain ~ ('Dom name period))
-    => SSymbol name
-    -> SNat    period
-    -> Clock domain 'Source
-  GatedClock
-    :: (domain ~ ('Dom name period))
-    => SSymbol name
-    -> SNat    period
-    -> Signal domain Bool
-    -> Clock  domain 'Gated
+    :: SSymbol nm
+    -> Clock nm 'Source
 
--- | Get the clock period of a 'Clock' (in /ps/) as a 'Num'
+  GatedClock
+    :: SSymbol nm
+    -> Signal nm Bool
+    -> Clock  nm 'Gated
+
+-- | Get the clock period of a clock (in /ps/) as a 'Num' from a 'Domain'
 clockPeriod
-  :: Num a
+  :: forall domain period gated a
+   . Num a
+  => KnownPeriod domain period
   => Clock domain gated
   -> a
-clockPeriod (Clock _ period)        = snatToNum period
-clockPeriod (GatedClock _ period _) = snatToNum period
+clockPeriod _clk =
+  case reifyPeriod @domain of
+    Period n -> snatToNum n
 
 -- | If the clock is gated, return 'Just' the /enable/ signal, 'Nothing'
 -- otherwise
 clockEnable
   :: Clock domain gated
   -> Maybe (Signal domain Bool)
-clockEnable Clock {}            = Nothing
-clockEnable (GatedClock _ _ en) = Just en
+clockEnable Clock {}          = Nothing
+clockEnable (GatedClock _ en) = Just en
 
 instance Show (Clock domain gated) where
-  show (Clock      nm period)   = show nm ++ show (snatToInteger period)
-  show (GatedClock nm period _) = show nm ++ show (snatToInteger period)
+  show (Clock nm)        = show ("<Clock of " ++ show nm ++ ">")
+  show (GatedClock nm _) = show ("<GatedClock of " ++ show nm ++ ">")
 
 -- | Clock gating primitive
-clockGate :: Clock domain gated -> Signal domain Bool -> Clock domain 'Gated
-clockGate (Clock nm rt)         en  = GatedClock nm rt en
-clockGate (GatedClock nm rt en) en' = GatedClock nm rt (en .&&. en')
+clockGate
+  :: Clock domain gated
+  -> Signal domain Bool
+  -> Clock domain 'Gated
+clockGate (Clock dom)         en  = GatedClock dom en
+clockGate (GatedClock dom en) en' = GatedClock dom (en .&&. en')
 {-# NOINLINE clockGate #-}
 
 -- | Clock generator for simulations. Do __not__ use this clock generator for
@@ -315,9 +449,11 @@ clockGate (GatedClock nm rt en) en' = GatedClock nm rt (en .&&. en')
 -- clkA = clockGen @DomA
 -- @
 clockGen
-  :: (domain ~ 'Dom nm period, KnownSymbol nm, KnownNat period)
-  => Clock domain 'Source
-clockGen = Clock SSymbol SNat
+  :: forall nm period
+   . KnownSymbol nm
+  => KnownPeriod nm period
+  => Clock nm 'Source
+clockGen = Clock (SSymbol @nm)
 {-# NOINLINE clockGen #-}
 
 -- | Clock generator to be used in the /testBench/ function.
@@ -360,10 +496,12 @@ clockGen = Clock SSymbol SNat
 --     rstB2          = asyncResetGen \@DomB2
 -- @
 tbClockGen
-  :: (domain ~ 'Dom nm period, KnownSymbol nm, KnownNat period)
-  => Signal domain Bool
-  -> Clock domain 'Source
-tbClockGen _ = Clock SSymbol SNat
+  :: forall nm period
+   . KnownSymbol nm
+  => KnownPeriod nm period
+  => Signal nm Bool
+  -> Clock nm 'Source
+tbClockGen _ = Clock (SSymbol @nm)
 {-# NOINLINE tbClockGen #-}
 
 -- | Asynchronous reset generator, for simulations and the /testBench/ function.
@@ -409,8 +547,11 @@ tbClockGen _ = Clock SSymbol SNat
 --     rst7           = 'asyncResetGen' \@Dom7
 --     rst9           = 'asyncResetGen' \@Dom9
 -- @
-asyncResetGen :: Reset domain 'Asynchronous
-asyncResetGen = Async (True :- pure False)
+asyncResetGen
+  :: KnownNat period
+  => Domain nm period init edge
+  -> Reset nm 'Asynchronous
+asyncResetGen _dom = Async (True :- pure False)
 {-# NOINLINE asyncResetGen #-}
 
 -- | Synchronous reset generator, for simulations and the /testBench/ function.
@@ -424,10 +565,11 @@ asyncResetGen = Async (True :- pure False)
 --
 -- __NB__: Can only be used for components with an /active-high/ reset
 -- port, which all __clash-prelude__ components are.
-syncResetGen :: ( domain ~ 'Dom n clkPeriod
-                , KnownNat clkPeriod )
-             => Reset domain 'Synchronous
-syncResetGen = Sync (True :- pure False)
+syncResetGen
+  :: KnownNat period
+  => Domain nm period init edge
+  -> Reset nm 'Synchronous
+syncResetGen _dom = Sync (True :- pure False)
 {-# NOINLINE syncResetGen #-}
 
 -- | The \"kind\" of reset
@@ -483,7 +625,7 @@ data ResetKind
 -- The underlying representation of resets is 'Bool'. Note that all components
 -- in the __clash-prelude__ package have an /active-high/ reset port, i.e., the
 -- component is reset when the reset port is 'True'.
-data Reset (domain :: Domain) (synchronous :: ResetKind) where
+data Reset (domain :: Symbol) (synchronous :: ResetKind) where
   Sync  :: Signal domain Bool -> Reset domain 'Synchronous
   Async :: Signal domain Bool -> Reset domain 'Asynchronous
 
@@ -575,7 +717,7 @@ delay#
 delay# Clock {} dflt =
   \s -> dflt :- s
 
-delay# (GatedClock _ _ en) dflt =
+delay# (GatedClock _ en) dflt =
     go dflt en
   where
     go o (e :- es) as@(~(x :- xs)) =
@@ -621,7 +763,7 @@ register# Clock {} (Async rst) powerUpVal resetVal =
           -- [Note: register strictness annotations]
       in  o1 `seqX` o1 :- (as `seq` go oN rs xs)
 
-register# (GatedClock _ _ ena) (Sync rst) powerUpVal resetVal =
+register# (GatedClock _ ena) (Sync rst) powerUpVal resetVal =
     go powerUpVal rst ena
   where
     go o rt@(~(r :- rs)) enas@(~(e :- es)) as@(~(x :- xs)) =
@@ -630,7 +772,7 @@ register# (GatedClock _ _ ena) (Sync rst) powerUpVal resetVal =
           -- [Note: register strictness annotations]
       in  o `seqX` o :- (rt `seq` enas `seq` as `seq` go oR rs es xs)
 
-register# (GatedClock _ _ ena) (Async rst) powerUpVal resetVal =
+register# (GatedClock _ ena) (Async rst) powerUpVal resetVal =
     go powerUpVal rst ena
   where
     go o (r :- rs) enas@(~(e :- es)) as@(~(x :- xs)) =

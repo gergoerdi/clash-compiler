@@ -98,7 +98,7 @@ rom# clk content rd = go clk ((arr !) <$> rd)
     go Clock {} =
       \s -> withFrozenCallStack (errorX "rom: initial value undefined") :- s
 
-    go (GatedClock _ _ en) =
+    go (GatedClock _ en) =
       go' (withFrozenCallStack (errorX "rom: initial value undefined")) en
 
     go' o (e :- es) as@(~(x :- xs)) =

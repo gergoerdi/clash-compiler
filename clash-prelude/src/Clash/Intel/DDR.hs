@@ -37,10 +37,11 @@ import Clash.Explicit.DDR
 --
 -- Reset values are @0@
 altddioIn
-  :: ( HasCallStack
-     , fast ~ 'Dom n pFast
-     , slow ~ 'Dom n (2*pFast)
-     , KnownNat m )
+  :: HasCallStack
+  => KnownPeriod fast pFast
+  => KnownPeriod slow pSlow
+  => pSlow ~ (2*pFast)
+  => KnownNat m
   => SSymbol deviceFamily
   -- ^ The FPGA family
   --
@@ -62,10 +63,11 @@ altddioIn _devFam clk rst = withFrozenCallStack ddrIn# clk rst 0 0 0
 --
 -- Reset value is @0@
 altddioOut
-  :: ( HasCallStack
-     , fast ~ 'Dom n pFast
-     , slow ~ 'Dom n (2*pFast)
-     , KnownNat m )
+  :: HasCallStack
+  => KnownPeriod fast pFast
+  => KnownPeriod slow pSlow
+  => pSlow ~ (2*pFast)
+  => KnownNat m
   => SSymbol deviceFamily
   -- ^ The FPGA family
   --
@@ -84,10 +86,11 @@ altddioOut devFam clk rst =
   uncurry (withFrozenCallStack altddioOut# devFam clk rst) . unbundle
 
 altddioOut#
-  :: ( HasCallStack
-     , fast ~ 'Dom n pFast
-     , slow ~ 'Dom n (2*pFast)
-     , KnownNat m )
+  :: HasCallStack
+  => KnownPeriod fast pFast
+  => KnownPeriod slow pSlow
+  => pSlow ~ (2*pFast)
+  => KnownNat m
   => SSymbol deviceFamily
   -> Clock slow gated
   -> Reset slow synchronous

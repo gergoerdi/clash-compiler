@@ -47,7 +47,8 @@ where
 import           Data.Coerce                   (coerce)
 import           Data.Kind                     (Type)
 import           Data.Proxy                    (Proxy(..))
-import           GHC.TypeLits                  (KnownNat, type (^), type (+), type (*), Nat)
+import           GHC.TypeLits
+  (KnownNat, type (^), type (+), type (*), Nat, Symbol)
 import           Data.Singletons.Prelude       (Apply, TyFun, type (@@))
 
 import Clash.Signal.Delayed.Internal
@@ -56,7 +57,7 @@ import Clash.Signal.Delayed.Internal
 import qualified Clash.Explicit.Signal.Delayed as E
 import            Clash.Sized.Vector           (Vec, dtfold)
 import            Clash.Signal
-  (HiddenClockReset, hideClockReset, Signal, delay, Domain(..))
+  (HiddenClockReset, hideClockReset, Signal, delay)
 
 import Clash.Promoted.Nat         (SNat (..), snatToInteger)
 
@@ -162,7 +163,7 @@ delayI
   -> DSignal domain (n+d) a
 delayI dflt = delayN (SNat :: SNat d) dflt
 
-data DelayedFold (domain :: Domain) (n :: Nat) (delay :: Nat) (a :: Type) (f :: TyFun Nat Type) :: Type
+data DelayedFold (domain :: Symbol) (n :: Nat) (delay :: Nat) (a :: Type) (f :: TyFun Nat Type) :: Type
 type instance Apply (DelayedFold domain n delay a) k = DSignal domain (n + (delay*k)) a
 
 -- | Tree fold over a 'Vec' of 'DSignal's with a combinatorial function,

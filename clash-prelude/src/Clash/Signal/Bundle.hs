@@ -25,12 +25,12 @@ module Clash.Signal.Bundle
   )
 where
 
-import GHC.TypeLits                 (KnownNat)
+import GHC.TypeLits                 (KnownNat, Symbol)
 import Prelude                      hiding (head, map, tail)
 
 import Clash.NamedTypes             ((:::))
 import Clash.Signal.Bundle.Internal (deriveBundleTuples)
-import Clash.Signal.Internal        (Domain, Signal (..))
+import Clash.Signal.Internal        (Signal (..))
 import Clash.Sized.BitVector        (Bit, BitVector)
 import Clash.Sized.Fixed            (Fixed)
 import Clash.Sized.Index            (Index)
@@ -70,7 +70,7 @@ import Clash.Sized.RTree            (RTree, lazyT)
 -- @
 --
 class Bundle a where
-  type Unbundled (domain :: Domain) a = res | res -> domain a
+  type Unbundled (domain :: Symbol) a = res | res -> domain a
   type Unbundled domain a = Signal domain a
   -- | Example:
   --

@@ -39,10 +39,11 @@ import Clash.Explicit.DDR
 --
 -- Reset values are @0@
 iddr
-  :: ( HasCallStack
-     , fast ~ 'Dom n pFast
-     , slow ~ 'Dom n (2*pFast)
-     , KnownNat m )
+  :: HasCallStack
+  => KnownPeriod fast pFast
+  => KnownPeriod slow pSlow
+  => pSlow ~ (2*pFast)
+  => KnownNat m
   => Clock slow gated
   -- ^ clock
   -> Reset slow synchronous
@@ -59,9 +60,10 @@ iddr clk rst = withFrozenCallStack ddrIn# clk rst 0 0 0
 --
 -- Reset value is @0@
 oddr
-  :: ( slow ~ 'Dom n (2*pFast)
-     , fast ~ 'Dom n pFast
-     , KnownNat m )
+  :: KnownPeriod fast pFast
+  => KnownPeriod slow pSlow
+  => pSlow ~ (2*pFast)
+  => KnownNat m
   => Clock slow gated
   -- ^ clock
   -> Reset slow synchronous
@@ -72,13 +74,15 @@ oddr
   -- ^ DDR output signal
 oddr clk rst = uncurry (withFrozenCallStack oddr# clk rst) . unbundle
 
-oddr# :: ( slow ~ 'Dom n (2*pFast)
-         , fast ~ 'Dom n pFast
-         , KnownNat m )
-      => Clock slow gated
-      -> Reset slow synchronous
-      -> Signal slow (BitVector m)
-      -> Signal slow (BitVector m)
-      -> Signal fast (BitVector m)
+oddr#
+  :: KnownPeriod fast pFast
+  => KnownPeriod slow pSlow
+  => pSlow ~ (2*pFast)
+  => KnownNat m
+  => Clock slow gated
+  -> Reset slow synchronous
+  -> Signal slow (BitVector m)
+  -> Signal slow (BitVector m)
+  -> Signal fast (BitVector m)
 oddr# clk rst = ddrOut# clk rst 0
 {-# NOINLINE oddr# #-}

@@ -39,7 +39,7 @@ import GHC.Stack             (HasCallStack, withFrozenCallStack)
 import GHC.TypeLits          (KnownNat)
 import qualified Data.Vector as V
 
-import Clash.Explicit.Signal ((.&&.), unbundle, unsafeSynchronizer)
+import Clash.Explicit.Signal ((.&&.), unbundle, unsafeSynchronizer, KnownPeriod)
 import Clash.Promoted.Nat    (SNat (..), snatToNum, pow2SNat)
 import Clash.Signal.Internal (Clock (..), Signal (..), clockEnable)
 import Clash.Sized.Unsigned  (Unsigned)
@@ -54,8 +54,10 @@ import Clash.XException      (errorX, maybeX)
 -- * See "Clash.Prelude.BlockRam#usingrams" for more information on how to use a
 -- RAM.
 asyncRamPow2
-  :: forall wdom rdom wgated rgated n a
+  :: forall wdom wperiod rdom rperiod wgated rgated n a
    . (KnownNat n, HasCallStack)
+  => KnownPeriod wdom wperiod
+  => KnownPeriod rdom rperiod
   => Clock wdom wgated
   -- ^ 'Clock' to which to synchronise the write port of the RAM
   -> Clock rdom rgated
@@ -81,6 +83,8 @@ asyncRamPow2 = \wclk rclk rd wrM -> withFrozenCallStack
 -- RAM.
 asyncRam
   :: (Enum addr, HasCallStack)
+  => KnownPeriod wdom wperiod
+  => KnownPeriod rdom rperiod
   => Clock wdom wgated
    -- ^ 'Clock' to which to synchronise the write port of the RAM
   -> Clock rdom rgated
@@ -103,6 +107,8 @@ asyncRam = \wclk rclk sz rd wrM ->
 -- | RAM primitive
 asyncRam#
   :: HasCallStack
+  => KnownPeriod wdom wperiod
+  => KnownPeriod rdom rperiod
   => Clock wdom wgated
   -- ^ 'Clock' to which to synchronise the write port of the RAM
   -> Clock rdom rgated

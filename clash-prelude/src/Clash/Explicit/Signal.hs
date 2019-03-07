@@ -128,9 +128,13 @@ meta-stability:
         type-signature similar to one of the above three situations.
 -}
 
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE GADTs     #-}
-{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE ConstraintKinds     #-}
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE GADTs               #-}
+{-# LANGUAGE MagicHash           #-}
+{-# LANGUAGE RankNTypes          #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications    #-}
 
 {-# LANGUAGE Trustworthy #-}
 
@@ -138,7 +142,20 @@ meta-stability:
 
 module Clash.Explicit.Signal
   ( -- * Synchronous signal
-    Signal, Domain (..), System
+    Signal, Domain (..), System, system
+    -- * Domain
+  , KnownDomain
+  , KnownPeriod
+  , KnownInit
+  , KnownEdge
+  , Period(..)
+  , Init(..)
+  , InitKind(..)
+  , Edge(..)
+  , EdgeKind(..)
+  , reifyPeriod
+  , reifyInit
+  , reifyEdge
     -- * Clock
   , Clock, ClockKind (..)
   , freqCalc
@@ -197,8 +214,10 @@ where
 import Control.DeepSeq       (NFData)
 import Data.Maybe            (isJust, fromJust)
 
-import Clash.Signal.Internal
+import Clash.Promoted.Nat    (SNat(..))
+import Clash.Promoted.Symbol (SSymbol(..))
 import Clash.Signal.Bundle   (Bundle (..))
+import Clash.Signal.Internal
 
 {- $setup
 >>> :set -XDataKinds -XTypeApplications
@@ -230,15 +249,18 @@ countSometimes clk rst = s where
 -- **Clock
 
 -- | A /clock/ (and /reset/) domain with clocks running at 100 MHz
-type System = 'Dom "system" 10000
+
+type System = "System"
+
+system :: Domain System 10000 'InitialDefined 'Rising
+system = mkDomain SSymbol SNat Init OnRisingEdge
 
 -- | Clock generator for the 'System' clock domain.
 --
 -- __NB__: should only be used for simulation, and __not__ for the /testBench/
 -- function. For the /testBench/ function, used 'tbSystemClockGen'
-systemClockGen
-  :: Clock System 'Source
-systemClockGen = clockGen
+systemClockGen :: Clock System 'Source
+systemClockGen = withDomain system clockGen
 
 -- | Clock generator for the 'System' clock domain.
 --
@@ -262,7 +284,7 @@ systemClockGen = clockGen
 tbSystemClockGen
   :: Signal System Bool
   -> Clock System 'Source
-tbSystemClockGen = tbClockGen
+tbSystemClockGen = withDomain system tbClockGen
 
 -- | Reset generator for the 'System' clock domain.
 --
@@ -284,7 +306,7 @@ tbSystemClockGen = tbClockGen
 --     rst            = 'systemResetGen'
 -- @
 systemResetGen :: Reset System 'Asynchronous
-systemResetGen = asyncResetGen
+systemResetGen = asyncResetGen system
 
 -- | Normally, asynchronous resets can be both asynchronously asserted and
 -- de-asserted. Asynchronous de-assertion can induce meta-stability in the
@@ -409,14 +431,21 @@ freqCalc freq = ceiling ((1.0 / freq) / 1.0e-12)
 -- >>> sampleN 12 (almostId clk2 clk7 0 (fromList [(1::Int)..10]))
 -- [0,0,1,2,3,4,5,6,7,8,9,10]
 unsafeSynchronizer
-  :: Clock  domain1 gated1 -- ^ 'Clock' of the incoming signal
-  -> Clock  domain2 gated2 -- ^ 'Clock' of the outgoing signal
+  :: forall domain1 period1 domain2 period2 gated1 gated2 a
+   . KnownPeriod domain1 period1
+  -- ^ 'KnownPeriod' of the incoming signal
+  => KnownPeriod domain2 period2
+  -- ^ 'KnownPeriod' of the outcoming signal
+  => Clock  domain1 gated1
+  -- ^ 'Clock' of the incoming signal
+  -> Clock  domain2 gated2
+  -- ^ 'Clock' of the outgoing signal
   -> Signal domain1 a
   -> Signal domain2 a
-unsafeSynchronizer clk1 clk2 s = s'
+unsafeSynchronizer c1 c2 s = s'
   where
-    t1    = clockPeriod clk1
-    t2    = clockPeriod clk2
+    t1 = clockPeriod c1
+    t2 = clockPeriod c2
     s' | t1 < t2   = compress   t2 t1 s
        | t1 > t2   = oversample t1 t2 s
        | otherwise = same s

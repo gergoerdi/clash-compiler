@@ -72,7 +72,7 @@ module Clash.Signal.Trace
 
   -- * Internal
   -- ** Types
-  , Period
+  , PeriodI
   , Changed
   , Value
   , Width
@@ -87,8 +87,8 @@ module Clash.Signal.Trace
   ) where
 
 -- Clash:
-import           Clash.Signal.Internal (Domain (..))
-import           Clash.Signal          (Signal, bundle, unbundle)
+import           Clash.Signal
+  (Signal, KnownPeriod, Period(..), bundle, unbundle, reifyPeriod)
 import           Clash.Sized.Vector    (Vec, iterateI)
 import qualified Clash.Sized.Vector    as Vector
 import           Clash.Class.BitPack   (BitPack, BitSize, pack)
@@ -117,11 +117,11 @@ import qualified Data.Version
 import qualified Paths_clash_prelude
 #endif
 
-type Period   = Int
+type PeriodI   = Int
 type Changed  = Bool
 type Value    = Integer
 type Width    = Int
-type TraceMap = Map.Map String (Period, Width, [Value])
+type TraceMap = Map.Map String (PeriodI, Width, [Value])
 
 -- | Map of traces used by the non-internal trace and dumpvcd functions.
 traceMap# :: IORef TraceMap
@@ -193,30 +193,29 @@ traceVecSignal# traceMap period vecTraceName (unbundle -> vecSignal) =
 -- was previously registered.
 --
 -- __NB__ Works correctly when creating VCD files from traced signal in
--- multi-clock circuits. However 'traceSignal1' might be more convinient to
+-- multi-clock circuits. However 'traceSignal1' might be more convenient to
 -- use when the domain of your circuit is polymorphic.
 traceSignal
-  :: forall domain a name period
-   . ( domain ~ 'Dom name period
-     , KnownNat period
-     , KnownNat (BitSize a)
-     , BitPack a
-     , NFData a )
+  :: forall a domain period
+   . KnownNat (BitSize a)
+  => KnownPeriod domain period
+  => BitPack a
+  => NFData a
   => String
   -- ^ Name of signal in the VCD output
   -> Signal domain a
   -- ^ Signal to trace
   -> Signal domain a
 traceSignal traceName signal =
-  unsafePerformIO $ traceSignal# traceMap# (snatToNum (SNat @ period))
-                      traceName signal
+  let Period period = reifyPeriod @domain in
+  unsafePerformIO $ traceSignal# traceMap# (snatToNum period) traceName signal
 {-# NOINLINE traceSignal #-}
 
 -- | Trace a single signal. Will emit an error if a signal with the same name
 -- was previously registered.
 --
--- __NB__ associates the traced signal with a clock period of /1/, which
--- results in incorrect VCD files when working with circuits that have
+-- __NB__ associates the traced signal with a clock period of /4 000 000/ ps,
+-- which results in incorrect VCD files when working with circuits that have
 -- multiple clocks. Use 'traceSignal' when working with circuits that have
 -- multiple clocks.
 traceSignal1
@@ -229,7 +228,7 @@ traceSignal1
   -- ^ Signal to trace
   -> Signal domain a
 traceSignal1 traceName signal =
-  unsafePerformIO (traceSignal# traceMap# 1 traceName signal)
+  unsafePerformIO (traceSignal# traceMap# 4000000 traceName signal)
 {-# NOINLINE traceSignal1 #-}
 
 -- | Trace a single vector signal: each element in the vector will show up as
@@ -240,21 +239,20 @@ traceSignal1 traceName signal =
 -- multi-clock circuits. However 'traceSignal1' might be more convinient to
 -- use when the domain of your circuit is polymorphic.
 traceVecSignal
-  :: forall domain a name period n
-   . ( domain ~ 'Dom name period
-     , KnownNat (BitSize a)
-     , KnownNat period
-     , KnownNat n
-     , BitPack a
-     , NFData a )
+  :: forall a n domain period
+   . KnownNat (BitSize a)
+  => KnownNat n
+  => KnownPeriod domain period
+  => BitPack a
+  => NFData a
   => String
   -- ^ Name of signal in debugging output. Will be appended by _0, _1, ..., _n.
   -> Signal domain (Vec (n+1) a)
   -- ^ Signal to trace
   -> Signal domain (Vec (n+1) a)
 traceVecSignal traceName signal =
-  unsafePerformIO $ traceVecSignal# traceMap# (snatToNum (SNat @ period))
-                      traceName signal
+  let Period period = reifyPeriod @domain in
+  unsafePerformIO $ traceVecSignal# traceMap# (snatToNum period) traceName signal
 {-# NOINLINE traceVecSignal #-}
 
 -- | Trace a single vector signal: each element in the vector will show up as
@@ -282,7 +280,7 @@ traceVecSignal1 traceName signal =
 iso8601Format :: UTCTime -> String
 iso8601Format = formatTime defaultTimeLocale "%Y-%m-%dT%H:%M:%S"
 
-toPeriodMap :: TraceMap -> Map.Map Period [(String, Width, [Value])]
+toPeriodMap :: TraceMap -> Map.Map PeriodI [(String, Width, [Value])]
 toPeriodMap m = foldl' go Map.empty (Map.assocs m)
   where
     go periodMap (traceName, (period, width, values)) =
