@@ -1,5 +1,5 @@
 {-# LANGUAGE RecordWildCards, LambdaCase, MagicHash, UnboxedTuples #-}
-module GHCi.Leak
+module Clash.GHCi.Leak
   ( LeakIndicators
   , getLeakIndicators
   , checkLeakIndicators
