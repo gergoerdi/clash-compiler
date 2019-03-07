@@ -29,7 +29,7 @@ repository head.hackage
 -- index state, to go along with the cabal.project.freeze file. update the index
 -- state by running `cabal update` twice and looking at the index state it
 -- displays to you (as the second update will be a no-op)
-index-state: 2018-12-12T14:50:52Z
+index-state: 2019-03-12T11:03:10Z
 
 package clash-ghc
   executable-dynamic: True
@@ -41,6 +41,16 @@ package clash-lib
   flags: debug
 
 optional-packages: clash-cosim/clash-cosim.cabal
+
+source-repository-package
+  type: git
+  location: https://github.com/ekmett/lens.git
+  tag: 50b77cd4b98d46548dcb23efc12dc84ca39bd3d6
+
+source-repository-package
+  type: git
+  location: https://github.com/Danielg/cabal-doctest.git
+  tag: 2c5f2ff85ac23ec130185aa1a25015e04d96533a
 
 -- Build documentation for all dependencies so we can upload docs to hackage
 -- with proper links
