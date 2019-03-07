@@ -59,6 +59,7 @@ import Util
 import Panic
 import UniqSupply
 import MonadUtils       ( liftIO )
+import DynamicLoading   ( initializePlugins )
 
 -- Imports for --abi-hash
 import LoadIface           ( loadUserInterface )
@@ -299,8 +300,9 @@ main' postLoadMode dflags0 args flagWarnings clashOpts = do
        DoMake                 -> doMake srcs
        DoMkDependHS           -> doMkDependHS (map fst srcs)
        StopBefore p           -> liftIO (oneShot hsc_env p srcs)
-       DoInteractive          -> ghciUI clashOpts srcs Nothing
-       DoEval exprs           -> ghciUI clashOpts srcs $ Just $ reverse exprs
+       DoInteractive          -> ghciUI clashOpts hsc_env dflags6 srcs Nothing
+       DoEval exprs           -> ghciUI clashOpts hsc_env dflags6 srcs $ Just $
+                                   reverse exprs
        DoAbiHash              -> abiHash (map fst srcs)
        ShowPackages           -> liftIO $ showPackages dflags6
        DoFrontend f           -> doFrontend f srcs
@@ -342,11 +344,15 @@ handleClashException df opts e = case fromException e of
       text msg
     showExtra _ _ = empty
 
-ghciUI :: IORef ClashOpts -> [(FilePath, Maybe Phase)] -> Maybe [String] -> Ghc ()
+ghciUI :: IORef ClashOpts -> HscEnv -> DynFlags -> [(FilePath, Maybe Phase)] -> Maybe [String]
+       -> Ghc ()
 #if !defined(GHCI)
-ghciUI _ _ _ = throwGhcException (CmdLineError "not built for interactive use")
+ghciUI _ _ _ _ = throwGhcException (CmdLineError "not built for interactive use")
 #else
-ghciUI opts  = interactiveUI (defaultGhciSettings opts)
+ghciUI clashOpts hsc_env dflags0 srcs maybe_expr = do
+  dflags1 <- liftIO (initializePlugins hsc_env dflags0)
+  _ <- GHC.setSessionDynFlags dflags1
+  interactiveUI (defaultGhciSettings clashOpts) srcs maybe_expr
 #endif
 
 -- -----------------------------------------------------------------------------
