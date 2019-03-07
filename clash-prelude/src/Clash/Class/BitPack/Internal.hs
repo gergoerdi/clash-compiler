@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Clash.Class.BitPack.Internal where
@@ -45,12 +46,21 @@ deriveBitPackTuples bitPackName bitSizeName packName unpackName appendName = do
         instTy = AppT bitPack $ tuple (v:vs)
 
         -- Associated type BitSize
+#if MIN_VERSION_template_haskell(2,15,0)
+        bitSizeTypeEq =
+          TySynEqn Nothing
+            (ConT bitSizeName `AppT` tuple (v:vs))
+            $ plus `AppT` (bitSize `AppT` v) `AppT`
+              (bitSize `AppT` foldl AppT (TupleT $ tupleNum - 1) vs)
+        bitSizeType = TySynInstD bitSizeTypeEq
+#else
         bitSizeTypeEq =
           TySynEqn
             [ tuple (v:vs) ]
             $ plus `AppT` (bitSize `AppT` v) `AppT`
               (bitSize `AppT` foldl AppT (TupleT $ tupleNum - 1) vs)
         bitSizeType = TySynInstD bitSizeName bitSizeTypeEq
+#endif
 
         pack =
           FunD

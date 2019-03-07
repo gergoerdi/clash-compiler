@@ -13,6 +13,7 @@ This module contains:
     e.g. one-hot, for a data type.
 
 -}
+{-# LANGUAGE CPP                #-}
 {-# LANGUAGE DataKinds          #-}
 {-# LANGUAGE DeriveAnyClass     #-}
 {-# LANGUAGE DeriveDataTypeable #-}
@@ -189,7 +190,11 @@ typeSize typ = do
       error $ unwords [
           "Could not find custom bit representation nor BitSize instance"
         , "for", show typ ++ "." ]
+#if MIN_VERSION_template_haskell(2,15,0)
+    [TySynInstD (TySynEqn _ _ (LitT (NumTyLit n)))] ->
+#else
     [TySynInstD _ (TySynEqn _ (LitT (NumTyLit n)))] ->
+#endif
       [| n |]
     [_impl] ->
       [| fromIntegral $ natVal (Proxy :: Proxy (BitSize $(return typ))) |]
@@ -864,9 +869,14 @@ deriveBitPack typQ = do
   let (DataReprAnn _name dataSize _constrs) = ann
 
   let bitSizeInst = TySynInstD
+#if MIN_VERSION_template_haskell(2,15,0)
+                      (TySynEqn Nothing
+                        (ConT ''BitSize `AppT` typ)
+#else
                       ''BitSize
                       (TySynEqn
                         [typ]
+#endif
                         (LitT (NumTyLit $ toInteger dataSize)))
 
   let bpInst = [ InstanceD
