@@ -31,4 +31,4 @@ ghc-8.6.2:
 
 ghc-head:
   extends: .tests
-  allow_failure: true
+  # allow_failure: true
