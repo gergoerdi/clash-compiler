@@ -484,6 +484,16 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
     -> reduce r
   "GHC.Prim.tanhDouble#" | Just r <- liftDD tanhDouble# args
     -> reduce r
+
+#if MIN_VERSION_ghc(8,7,0)
+  "GHC.Prim.asinhDouble#"  | Just r <- liftDD asinhDouble# args
+    -> reduce r
+  "GHC.Prim.acoshDouble#"  | Just r <- liftDD acoshDouble# args
+    -> reduce r
+  "GHC.Prim.atanhDouble#"  | Just r <- liftDD atanhDouble# args
+    -> reduce r
+#endif
+
   "GHC.Prim.**##" | Just r <- liftDDD (**##) args
     -> reduce r
 -- decodeDouble_2Int# :: Double# -> (#Int#, Word#, Word#, Int##)
@@ -585,6 +595,15 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
     -> reduce r
     where go f = case asinh (F# f) of
                    F# f' -> f'
+#endif
+
+#if MIN_VERSION_ghc(8,7,0)
+  "GHC.Prim.asinhFloat#"  | Just r <- liftFF asinhFloat# args
+    -> reduce r
+  "GHC.Prim.acoshFloat#"  | Just r <- liftFF acoshFloat# args
+    -> reduce r
+  "GHC.Prim.atanhFloat#"  | Just r <- liftFF atanhFloat# args
+    -> reduce r
 #endif
 
   "GHC.Prim.float2Double#" | [i] <- floatLiterals' args
