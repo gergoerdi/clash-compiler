@@ -92,7 +92,9 @@ dualFlipFlopSynchronizer clk1 clk2 rst i =
 -- * Asynchronous FIFO synchronizer
 
 fifoMem
-  :: Clock wdomain wgated
+  :: HasCallStack
+  => Undefined a
+  => Clock wdomain wgated
   -> Clock rdomain rgated
   -> SNat addrSize
   -> Signal wdomain Bool
@@ -140,7 +142,9 @@ isFull addrSize@SNat ptr s_ptr = case leTrans @1 @2 @addrSize of
 --
 -- __NB__: This synchroniser can be used for __word__-synchronization.
 asyncFIFOSynchronizer
-  :: (2 <= addrSize)
+  :: HasCallStack
+  => Undefined a
+  => (2 <= addrSize)
   => SNat addrSize
   -- ^ Size of the internally used addresses, the  FIFO contains @2^addrSize@
   -- elements.

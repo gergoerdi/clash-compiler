@@ -33,8 +33,9 @@ import           GHC.Stack            (HasCallStack, withFrozenCallStack)
 
 import qualified Clash.Explicit.RAM   as E
 import           Clash.Promoted.Nat   (SNat)
-import           Clash.Signal
+import           Clash.Signal         (HiddenClock, Signal, hideClock)
 import           Clash.Sized.Unsigned (Unsigned)
+import           Clash.XException     (Undefined)
 
 
 -- | Create a RAM with space for @n@ elements.
@@ -46,7 +47,10 @@ import           Clash.Sized.Unsigned (Unsigned)
 -- * See "Clash.Prelude.BlockRam#usingrams" for more information on how to use a
 -- RAM.
 asyncRam
-  :: (Enum addr, HiddenClock domain gated, HasCallStack)
+  :: HasCallStack
+  => HiddenClock domain gated
+  => Enum addr
+  => Undefined a
   => SNat n
   -- ^ Size @n@ of the RAM
   -> Signal domain addr
@@ -68,7 +72,10 @@ asyncRam = \sz rd wrM -> withFrozenCallStack
 -- * See "Clash.Prelude.BlockRam#usingrams" for more information on how to use a
 -- RAM.
 asyncRamPow2
-  :: (KnownNat n, HiddenClock domain gated, HasCallStack)
+  :: HasCallStack
+  => HiddenClock domain gated
+  => KnownNat n
+  => Undefined a
   => Signal domain (Unsigned n)
   -- ^ Read address @r@
   -> Signal domain (Maybe (Unsigned n, a))

@@ -43,7 +43,7 @@ import Clash.Explicit.Signal ((.&&.), unbundle, unsafeSynchronizer)
 import Clash.Promoted.Nat    (SNat (..), snatToNum, pow2SNat)
 import Clash.Signal.Internal (Clock (..), Signal (..), clockEnable)
 import Clash.Sized.Unsigned  (Unsigned)
-import Clash.XException      (errorX, maybeHasX)
+import Clash.XException      (maybeHasX, deepErrorX, Undefined)
 
 -- | Create a RAM with space for 2^@n@ elements
 --
@@ -55,7 +55,9 @@ import Clash.XException      (errorX, maybeHasX)
 -- RAM.
 asyncRamPow2
   :: forall wdom rdom wgated rgated n a
-   . (KnownNat n, HasCallStack)
+   . HasCallStack
+  => Undefined a
+  => KnownNat n
   => Clock wdom wgated
   -- ^ 'Clock' to which to synchronise the write port of the RAM
   -> Clock rdom rgated
@@ -80,7 +82,9 @@ asyncRamPow2 = \wclk rclk rd wrM -> withFrozenCallStack
 -- * See "Clash.Explicit.BlockRam#usingrams" for more information on how to use a
 -- RAM.
 asyncRam
-  :: (Enum addr, HasCallStack)
+  :: HasCallStack
+  => Undefined a
+  => Enum addr
   => Clock wdom wgated
    -- ^ 'Clock' to which to synchronise the write port of the RAM
   -> Clock rdom rgated
@@ -103,6 +107,7 @@ asyncRam = \wclk rclk sz rd wrM ->
 -- | RAM primitive
 asyncRam#
   :: HasCallStack
+  => Undefined a
   => Clock wdom wgated
   -- ^ 'Clock' to which to synchronise the write port of the RAM
   -> Clock rdom rgated
@@ -119,7 +124,7 @@ asyncRam# wclk rclk sz rd en wr din =
     rd'  = unsafeSynchronizer rclk wclk rd
     ramI = V.replicate
               (snatToNum sz)
-              (withFrozenCallStack (errorX "asyncRam#: initial value undefined"))
+              (withFrozenCallStack (deepErrorX "asyncRam#: initial value undefined"))
     en'  = case clockEnable wclk of
              Nothing  -> en
              Just wgt -> wgt .&&. en
