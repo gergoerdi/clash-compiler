@@ -52,6 +52,7 @@ import Data.Int          (Int8,Int16,Int32,Int64)
 import Data.Ord          (Down (Down))
 import Data.Ratio        (Ratio, numerator, denominator)
 import Data.Sequence     (Seq(Empty, (:<|)))
+import Data.Vector       (Vector, foldl')
 import Data.Word         (Word8,Word16,Word32,Word64)
 import GHC.Exts          (Char (C#), Double (D#), Float (F#), Int (I#), Word (W#))
 import GHC.Generics
@@ -575,6 +576,9 @@ instance NFDataX Word64   where rnfX = rwhnfX
 instance NFDataX Natural  where rnfX = rwhnfX
 
 instance NFDataX (a -> b) where rnfX = rwhnfX
+
+instance NFDataX a => NFDataX (Vector a) where
+  rnfX v = foldl' (\() -> rnfX) () v
 
 instance NFDataX1 Ratio where
   liftRnfX r x = r (numerator x) `seqX` r (denominator x)
