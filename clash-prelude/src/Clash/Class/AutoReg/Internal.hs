@@ -136,7 +136,7 @@ instance AutoReg Word64
 
 instance AutoReg Bit
 instance AutoReg (BitVector n)
-instance AutoReg (Signed n)
+instance (KnownNat n) => AutoReg (Signed n)
 instance AutoReg (Unsigned n)
 instance AutoReg (Index n)
 instance NFDataX (rep (int + frac)) => AutoReg (Fixed rep int frac)
