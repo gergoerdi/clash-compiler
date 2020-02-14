@@ -81,6 +81,12 @@ fromIntegerBench = env setup $ \m ->
   where
     setup = return smallValueI_pos
 
+toIntegerBench :: Benchmark
+toIntegerBench = env setup $ \m ->
+  bench "toInteger# WORD_SIZE_IN_BITS" $ nf (toInteger# :: Signed WORD_SIZE_IN_BITS -> Integer) m
+  where
+    setup = return smallValue_pos1
+
 packBench :: Benchmark
 packBench = env setup $ \m ->
   bench "pack# WORD_SIZE_IN_BITS" $ nf pack# m

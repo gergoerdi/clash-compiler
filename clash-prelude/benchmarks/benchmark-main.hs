@@ -30,6 +30,7 @@ main =
         ]
   , bgroup "Signed"
         [ S.fromIntegerBench
+        , S.toIntegerBench
         , S.addBench
         , S.negateBench
         , S.absBench
