@@ -88,7 +88,7 @@ import Data.Data                      (Data)
 import Data.Default.Class             (Default (..))
 import Data.Proxy                     (Proxy (..))
 import Data.Int                       (Int8, Int16, Int32, Int64)
-import Text.Read                      (Read (..), ReadPrec)
+import Text.Read                      (Read (..))
 import GHC.Generics                   (Generic)
 import GHC.TypeLits                   (KnownNat, Nat, type (+), natVal, sameNat)
 import GHC.TypeLits.Extra             (Max)
@@ -282,8 +282,7 @@ instance (KnownNat n) => ShowX (Signed n) where
 
 -- | None of the 'Read' class' methods are synthesizable.
 instance KnownNat n => Read (Signed n) where
-  -- TODO
-  -- readPrec = fromIntegral <$> (readPrec :: ReadPrec Integer)
+  readPrec = fromInteger <$> readPrec
 
 instance KnownNat n => BitPack (Signed n) where
   type BitSize (Signed n) = n
