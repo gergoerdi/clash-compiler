@@ -148,6 +148,15 @@ type Kit n a8 a16 a32 a64 a0 a =
     ((IsSpecialSize n ~ False) => a0) ->
     a
 
+{-# INLINE con0 #-}
+con0 :: forall n. (KnownNat n) => Kit n Int8 Int16 Int32 Int64 Integer (Signed n)
+con0 x8 x16 x32 x64 x0 = case sSize @n of
+    SSize8 -> S8 x8
+    SSize16 -> S16 x16
+    SSize32 -> S32 x32
+    SSize64 -> S64 x64
+    SSizeOther -> S x0
+
 {-# INLINE con #-}
 con :: forall n a. (KnownNat n) => Kit n (a -> Int8) (a -> Int16) (a -> Int32) (a -> Int64) (a -> Integer) (a -> Signed n)
 con f8 f16 f32 f64 f0 = case sSize @n of
@@ -362,11 +371,13 @@ instance KnownNat n => Bounded (Signed n) where
   minBound = minBound#
   maxBound = maxBound#
 
-minBound#,maxBound# :: KnownNat n => Signed n
+minBound#,maxBound# :: forall n. KnownNat n => Signed n
 {-# NOINLINE minBound# #-}
-minBound# = undefined -- TODO let res = S $ negate $ 2 ^ (natVal res - 1) in res
+minBound# = con0 minBound minBound minBound minBound $
+  negate $ 2 ^ (natVal (Proxy @n) - 1)
 {-# NOINLINE maxBound# #-}
-maxBound# = undefined -- TODO let res = S $ 2 ^ (natVal res - 1) - 1 in res
+maxBound# = con0 maxBound maxBound maxBound maxBound $
+  2 ^ (natVal (Proxy @n) - 1) - 1
 
 -- | Operators do @wrap-around@ on overflow
 instance KnownNat n => Num (Signed n) where
