@@ -172,6 +172,12 @@ type UnOp a = a -> a
 unOp :: forall n. (KnownNat n) => Kit n (UnOp Int8) (UnOp Int16) (UnOp Int32) (UnOp Int64) (UnOp Integer) (UnOp (Signed n))
 unOp f8 f16 f32 f64 f0 = unary (S8 . f8) (S16 . f16) (S32 . f32) (S64 . f64) (S . f0)
 
+type UnOp2 a b = a -> b -> a
+
+{-# INLINE unOp2 #-}
+unOp2 :: forall n a. (KnownNat n) => Kit n (UnOp2 Int8 a) (UnOp2 Int16 a) (UnOp2 Int32 a) (UnOp2 Int64 a) (UnOp2 Integer a) (UnOp2 (Signed n) a)
+unOp2 f8 f16 f32 f64 f0 = flip $ \y -> unOp (flip f8 y) (flip f16 y) (flip f32 y) (flip f64 y) (flip f0 y)
+
 type Bin a r = a -> a -> r
 
 {-# INLINE bin #-}
@@ -183,7 +189,7 @@ bin f8 f16 f32 f64 f0 = case sSize @n of
     SSize64    -> \ (S64 x) (S64 y) -> f64 x y
     SSizeOther -> \ (S x)   (S y)   -> f0  x y
 
-type BinOp a = a -> a -> a
+type BinOp a = Bin a a
 
 {-# INLINE binOp #-}
 binOp :: forall n. (KnownNat n) => Kit n (BinOp Int8) (BinOp Int16) (BinOp Int32) (BinOp Int64) (BinOp Integer) (BinOp (Signed n))
@@ -280,21 +286,19 @@ pack# :: forall n . KnownNat n => Signed n -> BitVector n
 pack# = unary f f f f f -- TODO
   where
     f :: (Integral a, Bits a, Num a) => a -> BitVector n
-    f i = let m = 1 `shiftL` fromInteger (natVal (Proxy @n))
-          in  if i < 0 then BV 0 (fromIntegral $ m + i) else BV 0 (fromIntegral i)
+    f i = BV 0 . fromIntegral $
+          let m = 1 `shiftL` fromInteger (natVal (Proxy @n))
+          in  if i < 0 then m + i else i
 
 {-# NOINLINE unpack# #-}
 unpack# :: forall n . KnownNat n => BitVector n -> Signed n
 unpack# = con f f f f f
   where
-    -- f (BV 0 i) =
-    --     let m = 1 `shiftL` fromInteger (natVal (Proxy @n) - 1)
-    --     in  if i >= m then S (i-2*m) else S i
+    f :: (Num a) => BitVector n -> a
+    f (BV 0 i) = fromInteger $ if i >= m then (i-2*m) else i
     f bv = undefError "Signed.unpack" [bv]
--- unpack# (BV 0 i) =
---   let m = 1 `shiftL` fromInteger (natVal (Proxy @n) - 1)
---   in  if i >= m then S (i-2*m) else S i
--- unpack# bv = undefError "Signed.unpack" [bv]
+
+    m = 1 `shiftL` fromInteger (natVal (Proxy @n) - 1)
 
 instance (KnownNat n) => Eq (Signed n) where
   (==) = eq#
@@ -465,8 +469,12 @@ div# (S a) (S b) = S (a `div` b)
 mod# (S a) (S b) = S (a `mod` b)
 
 {-# NOINLINE toInteger# #-}
-toInteger# :: Signed n -> Integer
-toInteger# (S n) = n
+toInteger# :: (KnownNat n) => Signed n -> Integer
+toInteger# = toInteger_INLINE
+
+{-# INLINE toInteger_INLINE #-}
+toInteger_INLINE :: (KnownNat n) => Signed n -> Integer
+toInteger_INLINE = unary toInteger toInteger toInteger toInteger id
 
 instance KnownNat n => Parity (Signed n) where
   even = even . pack
@@ -506,11 +514,15 @@ complement# (S a) = fromInteger_INLINE (complement a)
 
 shiftL#,shiftR#,rotateL#,rotateR# :: KnownNat n => Signed n -> Int -> Signed n
 {-# NOINLINE shiftL# #-}
-shiftL# _ b | b < 0  = error "'shiftL undefined for negative numbers"
-shiftL# (S n) b      = fromInteger_INLINE (shiftL n b)
+shiftL# = unOp2 f f f f f
+  where
+    f n b | b < 0     = error "'shiftL' undefined for negative numbers"
+          | otherwise = n `shiftL` b
 {-# NOINLINE shiftR# #-}
-shiftR# _ b | b < 0  = error "'shiftR undefined for negative numbers"
-shiftR# (S n) b      = fromInteger_INLINE (shiftR n b)
+shiftR# = unOp2 f f f f f
+  where
+    f n b | b < 0     = error "'shiftR undefined for negative numbers"
+          | otherwise = n `shiftR` b
 {-# NOINLINE rotateL# #-}
 rotateL# _ b | b < 0 = error "'shiftL undefined for negative numbers"
 rotateL# s@(S n) b   = fromInteger_INLINE (l .|. r)
@@ -563,8 +575,11 @@ resize# = undefined
 --                    else S i'
 
 {-# NOINLINE truncateB# #-}
-truncateB# :: KnownNat m => Signed (m + n) -> Signed m
-truncateB# (S n) = fromInteger_INLINE n
+truncateB# :: (KnownNat n, KnownNat m) => Signed (m + n) -> Signed m
+truncateB# = unary f f f f f
+  where
+    f :: (Integral a, KnownNat m) => a -> Signed m
+    f = fromInteger_INLINE . toInteger
 
 instance KnownNat n => Default (Signed n) where
   def = fromInteger# 0
