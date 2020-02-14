@@ -426,10 +426,13 @@ fromInteger# = fromInteger_INLINE
 
 {-# INLINE fromInteger_INLINE #-}
 fromInteger_INLINE :: forall n . KnownNat n => Integer -> Signed n
-fromInteger_INLINE = con f f f f f
+fromInteger_INLINE = con fromInteger fromInteger fromInteger fromInteger $ \i ->
+  case divMod i mask of
+      (s,i') | even s    -> i'
+             | otherwise -> i' - mask
   where
-    f :: (Integral a) => Integer -> a
-    f = fromIntegerN_INLINE (Proxy @n)
+    mask :: Integer
+    mask = 1 `shiftL` fromInteger (natVal (Proxy @n) - 1)
 
 {-# INLINE fromIntegerN_INLINE #-}
 fromIntegerN_INLINE :: (Num a) => KnownNat n => Proxy n -> Integer -> a
