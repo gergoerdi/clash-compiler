@@ -440,23 +440,23 @@ fromIntegerN_INLINE n i = if mask == 0 then 0 else fromIntegral res
         (s,i') | even s    -> i'
                | otherwise -> i' - mask
 
-instance ExtendingNum (Signed m) (Signed n) where
+instance (KnownNat n, KnownNat m) => ExtendingNum (Signed m) (Signed n) where
   type AResult (Signed m) (Signed n) = Signed (Max m n + 1)
   add  = plus#
   sub = minus#
   type MResult (Signed m) (Signed n) = Signed (m + n)
   mul = times#
 
-plus#, minus# :: Signed m -> Signed n -> Signed (Max m n + 1)
+plus#, minus# :: (KnownNat n, KnownNat m) => Signed m -> Signed n -> Signed (Max m n + 1)
 {-# NOINLINE plus# #-}
-plus# = undefined -- TODO (S a) (S b) = S (a + b)
+plus# a b = fromInteger_INLINE $ toInteger_INLINE a + toInteger_INLINE b
 
 {-# NOINLINE minus# #-}
-minus# = undefined -- TODO (S a) (S b) = S (a - b)
+minus# a b = fromInteger_INLINE $ toInteger_INLINE a - toInteger_INLINE b
 
 {-# NOINLINE times# #-}
-times# :: Signed m -> Signed n -> Signed (m + n)
-times# = undefined -- TODO (S a) (S b) = S (a * b)
+times# :: (KnownNat n, KnownNat m) => Signed m -> Signed n -> Signed (m + n)
+times# a b = fromInteger_INLINE $ toInteger_INLINE a * toInteger_INLINE b
 
 instance KnownNat n => Real (Signed n) where
   toRational = toRational . toInteger#
