@@ -126,7 +126,7 @@ data SSize (n :: Nat) where
     SSize16 :: SSize 16
     SSize32 :: SSize 32
     SSize64 :: SSize 64
-    SSizeOther :: (IsSpecialSize n ~ False) => SSize n
+    SSizeOther :: (IsSpecialSize n ~ 'False) => SSize n
 
 sSize :: forall n. (KnownNat n) => SSize n
 sSize =
@@ -145,7 +145,7 @@ type Kit n a8 a16 a32 a64 a0 a =
     ((n ~ 16) => a16) ->
     ((n ~ 32) => a32) ->
     ((n ~ 64) => a64) ->
-    ((IsSpecialSize n ~ False) => a0) ->
+    ((IsSpecialSize n ~ 'False) => a0) ->
     a
 
 {-# INLINE con0 #-}
@@ -247,7 +247,7 @@ data Signed (n :: Nat) where
     S16 :: Int16 -> Signed 16
     S32 :: Int32 -> Signed 32
     S64 :: Int64 -> Signed 64
-    S :: (IsSpecialSize n ~ False) => Integer -> Signed n
+    S :: (IsSpecialSize n ~ 'False) => Integer -> Signed n
 --   deriving (Data, Generic) -- TODO
 
 instance (KnownNat n) => Data (Signed n) where
