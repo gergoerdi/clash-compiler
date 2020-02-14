@@ -429,12 +429,16 @@ fromInteger_INLINE :: forall n . KnownNat n => Integer -> Signed n
 fromInteger_INLINE = con f f f f f
   where
     f :: (Integral a) => Integer -> a
-    f i = if mask == 0 then 0 else fromIntegral res
-      where
-        mask = 1 `shiftL` fromInteger (natVal (Proxy @n) -1)
-        res  = case divMod i mask of
-                 (s,i') | even s    -> i'
-                        | otherwise -> i' - mask
+    f = fromIntegerN_INLINE (Proxy @n)
+
+{-# INLINE fromIntegerN_INLINE #-}
+fromIntegerN_INLINE :: (Num a) => KnownNat n => Proxy n -> Integer -> a
+fromIntegerN_INLINE n i = if mask == 0 then 0 else fromIntegral res
+  where
+    mask = 1 `shiftL` fromInteger (natVal n -1)
+    res  = case divMod i mask of
+        (s,i') | even s    -> i'
+               | otherwise -> i' - mask
 
 instance ExtendingNum (Signed m) (Signed n) where
   type AResult (Signed m) (Signed n) = Signed (Max m n + 1)
@@ -510,17 +514,17 @@ instance KnownNat n => Bits (Signed n) where
   rotateR v i       = rotateR# v i
   popCount s        = popCount (pack# s)
 
-and#,or#,xor# :: KnownNat n => Signed n -> Signed n -> Signed n
+and#,or#,xor# :: forall n. KnownNat n => Signed n -> Signed n -> Signed n
 {-# NOINLINE and# #-}
-and# (S a) (S b) = fromInteger_INLINE (a .&. b)
+and# = binOp (.&.) (.&.) (.&.) (.&.) (\a b -> fromIntegerN_INLINE (Proxy @n) (a .&. b))
 {-# NOINLINE or# #-}
-or# (S a) (S b)  = fromInteger_INLINE (a .|. b)
+or# = binOp (.|.) (.|.) (.|.) (.|.) (\a b -> fromIntegerN_INLINE (Proxy @n) (a .|. b))
 {-# NOINLINE xor# #-}
-xor# (S a) (S b) = fromInteger_INLINE (xor a b)
+xor# = binOp xor xor xor xor $ \ a b -> fromIntegerN_INLINE (Proxy @n) (xor a b)
 
 {-# NOINLINE complement# #-}
-complement# :: KnownNat n => Signed n -> Signed n
-complement# (S a) = fromInteger_INLINE (complement a)
+complement# :: forall n. KnownNat n => Signed n -> Signed n
+complement# = unOp complement complement complement complement (fromIntegerN_INLINE (Proxy @n) . complement)
 
 shiftL#,shiftR#,rotateL#,rotateR# :: KnownNat n => Signed n -> Int -> Signed n
 {-# NOINLINE shiftL# #-}
