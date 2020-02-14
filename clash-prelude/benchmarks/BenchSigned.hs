@@ -8,6 +8,7 @@ module BenchSigned where
 
 import Clash.Sized.BitVector
 import Clash.Sized.Internal.Signed
+import GHC.TypeLits                (KnownNat)
 import Criterion                   (Benchmark, env, bench, nf)
 import Language.Haskell.TH.Syntax  (lift)
 
@@ -98,3 +99,13 @@ unpackBench = env setup $ \m ->
   bench "unpack# WORD_SIZE_IN_BITS" $ nf unpack# m
   where
     setup = return smallValueBV
+
+multBenchPoly :: Benchmark
+multBenchPoly = env setup $ \m ->
+  bench "Poly *# WORD_SIZE_IN_BITS" $ nf (uncurry (polyMultSigned)) m
+  where
+    setup = return (smallValue_pos1,smallValue_pos2)
+
+polyMultSigned :: KnownNat n => Signed n -> Signed n -> Signed n
+polyMultSigned = (*#)
+{-# NOINLINE polyMultSigned #-}

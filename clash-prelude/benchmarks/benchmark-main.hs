@@ -41,6 +41,7 @@ main =
         , S.timesBench
         , S.packBench
         , S.unpackBench
+        , S.multBenchPoly
         ]
   , bgroup "Fixed"
         [ F.fromRationalBench
