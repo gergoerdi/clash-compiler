@@ -132,7 +132,7 @@ module Clash.Signal.Internal
 where
 
 import Type.Reflection            (Typeable)
-import Control.Applicative        (liftA2, liftA3)
+import Control.Applicative        (liftA2)
 import Control.DeepSeq            (NFData)
 import Clash.Annotations.Primitive (hasBlackBox)
 import Data.Binary                (Binary)
@@ -1104,6 +1104,10 @@ register# (Clock dom) rst (fromEnable -> ena) powerUpVal0 resetVal =
 {-# NOINLINE register# #-}
 {-# ANN register# hasBlackBox #-}
 
+fmapS :: (a -> b) -> Signal dom a -> Signal dom b
+fmapS f = go
+  where go (a :- as) = f a :- (a `seqX` go as)
+
 -- | The above type is a generalization for:
 --
 -- @
@@ -1112,8 +1116,9 @@ register# (Clock dom) rst (fromEnable -> ena) powerUpVal0 resetVal =
 --
 -- A multiplexer. Given "@'mux' b t f@", output @t@ when @b@ is 'True', and @f@
 -- when @b@ is 'False'.
-mux :: Applicative f => f Bool -> f a -> f a -> f a
-mux = liftA3 (\b t f -> if b then t else f)
+mux :: Signal dom Bool -> Signal dom a -> Signal dom a -> Signal dom a
+mux bs ts fs = ite `fmapS` bs <*> ts <*> fs
+  where  ite b t f = if b then t else f
 {-# INLINE mux #-}
 
 infix 4 .==.
