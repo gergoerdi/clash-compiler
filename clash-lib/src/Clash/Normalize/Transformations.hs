@@ -2648,14 +2648,7 @@ reduceBindersCleanup isN origInl (!substM,!substFVs,!doneInl) u _ =
     Nothing -> case lookupVarEnvDirectly u origInl of
       Nothing ->
         -- let-binding not found, cannot extend the substitution
-        if elemUniqInScopeSet u isN then
-          (substM,substFVs,doneInl)
-        else
-          error [I.i|
-            Internal error: 'reduceBindersCleanup' encountered a variable
-            reference that was neither in 'doneInl', 'origInl', or in the
-            transformation's in scope set. Unique was: '#{u}'.
-          |]
+        (substM,substFVs,doneInl)
       Just ((v,e),eFVs) ->
         -- Simplify the transitive dependencies
         let (sM,substFVsE,doneInl1) =
