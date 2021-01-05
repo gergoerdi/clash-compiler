@@ -46,7 +46,7 @@ layoutOneLine doc = scan 0 [doc]
 renderOneLine
   :: PP.Doc ann
   -> LT.Text
-renderOneLine = renderLazy . layoutOneLine
+renderOneLine = renderLazy . layoutCompact
 
 int :: Applicative f => Int -> f Doc
 int = pure . PP.pretty
