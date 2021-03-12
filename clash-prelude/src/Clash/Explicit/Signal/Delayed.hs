@@ -49,7 +49,11 @@ import Prelude                    ((.), (<$>), (<*>), id, Num(..))
 import Data.Coerce                (coerce)
 import Data.Kind                  (Type)
 import Data.Proxy                 (Proxy (..))
+#if MIN_VERSION_singletons(2,8,0)
+import Prelude.Singletons         (Apply, TyFun, type (@@))
+#else
 import Data.Singletons.Prelude    (Apply, TyFun, type (@@))
+#endif
 import GHC.TypeLits               (KnownNat, Nat, type (+), type (^), type (*))
 
 import Clash.Sized.Vector

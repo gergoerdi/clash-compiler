@@ -109,7 +109,11 @@ import Data.Default.Class         (Default (..))
 import qualified Data.Foldable    as F
 import Data.Kind                  (Type)
 import Data.Proxy                 (Proxy (..))
+#if MIN_VERSION_singletons(2,8,0)
+import Prelude.Singletons         (TyFun,Apply,type (@@))
+#else
 import Data.Singletons.Prelude    (TyFun,Apply,type (@@))
+#endif
 import GHC.TypeLits               (CmpNat, KnownNat, Nat, type (+), type (-), type (*),
                                    type (^), type (<=), natVal)
 import GHC.Base                   (Int(I#),Int#,isTrue#)

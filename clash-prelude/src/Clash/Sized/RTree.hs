@@ -55,7 +55,11 @@ import Data.Default.Class          (Default (..))
 import Data.Either                 (isLeft)
 import Data.Foldable               (toList)
 import Data.Kind                   (Type)
+#if MIN_VERSION_singletons(2,8,0)
+import Prelude.Singletons          (Apply, TyFun, type (@@))
+#else
 import Data.Singletons.Prelude     (Apply, TyFun, type (@@))
+#endif
 import Data.Proxy                  (Proxy (..))
 import GHC.TypeLits                (KnownNat, Nat, type (+), type (^), type (*))
 import Language.Haskell.TH.Syntax  (Lift(..))
